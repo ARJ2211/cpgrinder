@@ -146,3 +146,18 @@ func (s *Store) initSchema() error {
 
 	return nil
 }
+
+/*
+Closes the database connection
+*/
+func (s *Store) Close() error {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	err := s.db.Close()
+	if err != nil {
+		return err
+	}
+
+	return err
+}

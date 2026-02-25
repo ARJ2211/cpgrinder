@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/ARJ2211/cpgrinder/internal/platform"
+	"github.com/ARJ2211/cpgrinder/internal/store"
 )
 
 type globalFlags struct {
@@ -69,4 +70,15 @@ func main() {
 
 	fmt.Println(dbPath)
 	fmt.Println(workspaceDir)
+
+	dbStore, err := store.Open(dbPath)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+
+	if err := dbStore.Close(); err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
 }
