@@ -87,7 +87,7 @@ func main() {
 	fmt.Println("COUNT OF PROBLEMS: " + strconv.Itoa(c))
 
 	// Upsert the fixtures from the catalog.json
-	if err := dbStore.UpsertProblemsFromFixture(); err != nil {
+	if err := dbStore.UpsertProblemsFromFixture(gf.Import); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}

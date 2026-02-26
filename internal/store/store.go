@@ -185,18 +185,28 @@ func (s *Store) CountProblems() (int, error) {
 Upserts fixtures into the db from the fixture/catalog.json or from
 the import flag.
 */
-func (s *Store) UpsertProblemsFromFixture() error {
+func (s *Store) UpsertProblemsFromFixture(fixturePath string) error {
 	fmt.Println("UPSERT FIXTURES")
 	tx, _ := s.db.Begin()
 
 	var fixtures []ProblemJson
 
-	data, err := os.ReadFile("fixtures/catalog.json")
-	if err != nil {
-		return err
+	var data []byte
+	if fixturePath != "" {
+		dataT, err := os.ReadFile(fixturePath)
+		if err != nil {
+			return err
+		}
+		data = dataT
+	} else {
+		dataT, err := os.ReadFile("fixtures/catalog.json")
+		if err != nil {
+			return err
+		}
+		data = dataT
 	}
 
-	err = json.Unmarshal(data, &fixtures)
+	err := json.Unmarshal(data, &fixtures)
 	if err != nil {
 		return err
 	}
