@@ -12,7 +12,7 @@ type Sample struct {
 
 /*
 Unmarshalled structure of how a problem would
-be stored in the database
+be stored in the database used by ListProblem
 */
 type Problem struct {
 	Id         string
@@ -28,7 +28,8 @@ type Problem struct {
 
 /*
 Unmarshalled structure of how a problem would
-be fetched by ID from the database
+be fetched by ID from the database used by
+GetProblemByID
 */
 type ProblemID struct {
 	Id          string

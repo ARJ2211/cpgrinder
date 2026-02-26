@@ -5,10 +5,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
+
+	tea "charm.land/bubbletea/v2"
 
 	"github.com/ARJ2211/cpgrinder/internal/platform"
 	"github.com/ARJ2211/cpgrinder/internal/store"
+	"github.com/ARJ2211/cpgrinder/tui"
 )
 
 type globalFlags struct {
@@ -59,76 +61,27 @@ func main() {
 		}
 	}
 
-	res := fmt.Sprintf(`
-	You have selected the following flags:
-	--------------------------------------
-	1. DB path: %s
-	2. Import path: %s
-	3. Reset bool: %v
-	`, gf.DB, gf.Import, gf.Reset)
-
-	println(res + "\n\n")
-
-	dbPath, workspaceDir, err := platform.ResolvePaths(gf.DB)
+	dbPath, workspacePath, err := platform.ResolvePaths(gf.DB)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	fmt.Println(dbPath)
-	fmt.Println(workspaceDir)
-
-	dbStore, err := store.Open(dbPath)
+	dbStore, err := store.Open(dbPath, workspacePath)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	// Count of the problems at fresh db
-	c, err := dbStore.CountProblems()
+	m, err := tui.InitialModel(dbStore)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	fmt.Println("COUNT OF PROBLEMS: " + strconv.Itoa(c))
 
-	// Upsert the fixtures from the catalog.json
-	if err := dbStore.UpsertProblemsFromFixture(gf.Import); err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-	c1, err := dbStore.CountProblems()
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-	fmt.Println("COUNT OF UPSERTED PROBLEMS: " + strconv.Itoa(c1))
-
-	// List Problems that are there in the database
-	fmt.Println()
-	uf := store.UserFilters{Limit: 10, Title: "elevator"}
-	problems, err := dbStore.ListProblems(uf)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-	for i, p := range problems {
-		fmt.Println(strconv.Itoa(i + 1))
-		fmt.Println(p.Title, p.Id)
-	}
-
-	// Get a problem by id
-	fmt.Println()
-	pID, err := dbStore.GetProblemByID("7c7b07f7-0e6f-40d8-a55a-0a160ac1ef56")
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-	PrintJSON(pID)
-
-	// CLOSE THE DB
-	if err := dbStore.Close(); err != nil {
-		fmt.Println(err.Error())
+	p := tea.NewProgram(m)
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
 }

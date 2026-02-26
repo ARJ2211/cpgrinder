@@ -4,11 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,19 +17,17 @@ import (
 Struct to help store the DB Store properties.
 */
 type Store struct {
-	db     *sql.DB
-	closed bool
-	dbPath string
-	mutex  sync.Mutex
+	db            *sql.DB
+	workspacePath string
+	closed        bool
+	dbPath        string
 }
 
 /*
 Returns a Store structure that can be used
 */
-func Open(dbPath string) (*Store, error) {
+func Open(dbPath, workspacePath string) (*Store, error) {
 	s := &Store{}
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
 
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
@@ -40,6 +36,11 @@ func Open(dbPath string) (*Store, error) {
 
 	if err := db.Ping(); err != nil {
 		return nil, err
+	}
+
+	_, err = os.Stat(workspacePath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, errors.New("workspace path is invalid")
 	}
 
 	var pramgaStmts = []string{
@@ -159,9 +160,6 @@ func (s *Store) initSchema() error {
 Closes the database connection
 */
 func (s *Store) Close() error {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
-
 	err := s.db.Close()
 	if err != nil {
 		return err
@@ -320,8 +318,6 @@ func (s *Store) ListProblems(uf UserFilters) ([]Problem, error) {
 		query += " LIMIT ? "
 		args = append(args, uf.Limit)
 	}
-
-	fmt.Println(query)
 
 	var fetchedProblems []Problem
 
