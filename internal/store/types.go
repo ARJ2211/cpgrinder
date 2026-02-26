@@ -27,6 +27,26 @@ type Problem struct {
 }
 
 /*
+Unmarshalled structure of how a problem would
+be fetched by ID from the database
+*/
+type ProblemID struct {
+	Id          string
+	Source      string
+	SourceID    string
+	Title       string
+	Url         string
+	Difficulty  string
+	Rating      int
+	Topics      []string
+	Tags        []string
+	StatementMd string
+	Samples     []Sample
+	CreatedAt   int
+	updatedAt   int
+}
+
+/*
 Different filters that can be applied to
 the ListProblems method.
 */

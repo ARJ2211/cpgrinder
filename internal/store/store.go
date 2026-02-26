@@ -362,3 +362,43 @@ func (s *Store) ListProblems(uf UserFilters) ([]Problem, error) {
 
 	return fetchedProblems, nil
 }
+
+/*
+This function returns a Problem struct based on the given
+ID - Marshal the required fields too.
+*/
+func (s *Store) GetProblemByID(id string) (ProblemID, error) {
+	var pID ProblemID
+
+	var topicString string
+	var tagString string
+	var sampleString string
+
+	row := s.db.QueryRow("SELECT * FROM problems WHERE id = ?", id)
+	if row.Err() != nil {
+		return ProblemID{}, row.Err()
+	}
+
+	if err := row.Scan(
+		&pID.Id, &pID.Source, &pID.SourceID, &pID.Title,
+		&pID.Url, &pID.Difficulty, &pID.Rating,
+		&topicString, &tagString, &pID.StatementMd,
+		&sampleString, &pID.CreatedAt, &pID.updatedAt,
+	); err != nil {
+		return ProblemID{}, err
+	}
+
+	if err := json.Unmarshal([]byte(topicString), &pID.Topics); err != nil {
+		return ProblemID{}, err
+	}
+
+	if err := json.Unmarshal([]byte(tagString), &pID.Tags); err != nil {
+		return ProblemID{}, err
+	}
+
+	if err := json.Unmarshal([]byte(sampleString), &pID.Samples); err != nil {
+		return ProblemID{}, err
+	}
+
+	return pID, nil
+}

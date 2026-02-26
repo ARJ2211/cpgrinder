@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -14,6 +15,11 @@ type globalFlags struct {
 	DB     string
 	Import string
 	Reset  bool
+}
+
+func PrintJSON(obj interface{}) {
+	bytes, _ := json.MarshalIndent(obj, "\t", "\t")
+	fmt.Println(string(bytes))
 }
 
 func main() {
@@ -100,7 +106,7 @@ func main() {
 
 	// List Problems that are there in the database
 	fmt.Println()
-	uf := store.UserFilters{Limit: 10}
+	uf := store.UserFilters{Limit: 10, Title: "elevator"}
 	problems, err := dbStore.ListProblems(uf)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -108,9 +114,19 @@ func main() {
 	}
 	for i, p := range problems {
 		fmt.Println(strconv.Itoa(i + 1))
-		fmt.Println(p.Title, p.CreatedAt)
+		fmt.Println(p.Title, p.Id)
 	}
 
+	// Get a problem by id
+	fmt.Println()
+	pID, err := dbStore.GetProblemByID("7c7b07f7-0e6f-40d8-a55a-0a160ac1ef56")
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+	PrintJSON(pID)
+
+	// CLOSE THE DB
 	if err := dbStore.Close(); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
