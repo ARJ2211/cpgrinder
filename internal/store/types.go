@@ -31,14 +31,14 @@ type Problem struct {
 }
 
 /*
-Unmarshalled structure of how a problem summary would
-be stored. This is used by ListProblems() function
+Different filters that can be applied to
+the ListProblems method.
 */
-type ProblemSummary struct {
-	Id         string
+type UserFilters struct {
 	Title      string
-	Difficulty string
-	Rating     string
 	Source     string
-	SourceId   string
+	Difficulty string
+	Topic      string // Single topic filter
+	Tag        string // Single tag filter
+	Limit      int
 }

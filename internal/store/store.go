@@ -3,7 +3,10 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -278,14 +281,54 @@ func (s *Store) UpsertProblemsFromFixture(fixturePath string) error {
 This function give a list of problems that is currently stored
 in our database
 */
-func (s *Store) ListProblems(limit int) ([]Problem, error) {
+func (s *Store) ListProblems(uf UserFilters) ([]Problem, error) {
 	if err := s.db.Ping(); err != nil {
 		return nil, err
 	}
 
+	query := `SELECT * FROM problems`
+	var whereClauses []string
+	var args []interface{}
+
+	if uf.Source != "" && slices.Contains([]string{"codeforces", "leetcode"}, uf.Source) {
+		whereClauses = append(whereClauses, "source = ?")
+		args = append(args, uf.Source)
+	}
+
+	if uf.Difficulty != "" {
+		whereClauses = append(whereClauses, "difficult = ?")
+		args = append(args, uf.Difficulty)
+	}
+
+	if uf.Topic != "" {
+		whereClauses = append(whereClauses, "EXISTS (SELECT 1 FROM json_each(topics) WHERE value = ?)")
+		args = append(args, uf.Topic)
+	}
+
+	if uf.Tag != "" {
+		whereClauses = append(whereClauses, "EXISTS (SELECT 1 FROM json_each(tags) WHERE value = ?)")
+		args = append(args, uf.Tag)
+	}
+
+	if uf.Title != "" {
+		whereClauses = append(whereClauses, "title LIKE ?")
+		args = append(args, "%"+uf.Title+"%")
+	}
+
+	if len(whereClauses) > 0 {
+		query += " WHERE " + strings.Join(whereClauses, " AND ")
+	}
+
+	if uf.Limit != 0 {
+		query += " LIMIT ? "
+		args = append(args, uf.Limit)
+	}
+
+	fmt.Println(query)
+
 	var fetchedProblems []Problem
 
-	rows, err := s.db.Query(`SELECT * FROM problems LIMIT ?`, limit)
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}
