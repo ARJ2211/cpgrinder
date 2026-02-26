@@ -275,3 +275,8 @@ func (s *Store) UpsertProblemsFromFixture(fixturePath string) error {
 
 	return nil
 }
+
+/*
+This function give a list of problems that is currently stored
+in our database
+*/

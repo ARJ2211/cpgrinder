@@ -27,3 +27,16 @@ type Problem struct {
 	StatementMd string
 	Samples     []Sample
 }
+
+/*
+Unmarshalled structure of how a problem summary would
+be stored. This is used by ListProblems() function
+*/
+type ProblemSummary struct {
+	Id         string
+	Title      string
+	Difficulty string
+	Rating     string
+	Source     string
+	SourceId   string
+}

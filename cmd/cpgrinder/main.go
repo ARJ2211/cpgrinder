@@ -96,7 +96,7 @@ func main() {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
-	fmt.Println("COUNT OF PROBLEMS: " + strconv.Itoa(c1))
+	fmt.Println("COUNT OF UPSERTED PROBLEMS: " + strconv.Itoa(c1))
 
 	if err := dbStore.Close(); err != nil {
 		fmt.Println(err.Error())
