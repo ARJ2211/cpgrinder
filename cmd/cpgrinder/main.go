@@ -79,6 +79,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Clear terminal screen
+	fmt.Print("\033[H\033[2J")
+
 	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)

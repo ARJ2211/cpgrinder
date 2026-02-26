@@ -7,83 +7,72 @@ import (
 	"github.com/ARJ2211/cpgrinder/internal/store"
 )
 
-type model struct {
-	dbStore  store.Store
-	choices  []string
-	cursor   int
-	selected map[int]struct{}
+type ProblemListModel struct {
+	dbStore  store.Store     // dbStore
+	choices  []store.Problem // List of problems
+	cursor   int             // The position of the problem
+	selected string          // The ID of the problem
 }
 
 // Initialize it with a list of problems in the database
-func InitialModel(dbStore *store.Store) (model, error) {
+func InitialModel(dbStore *store.Store) (ProblemListModel, error) {
 	filters := store.UserFilters{
-		Limit: 10,
+		Limit: 30,
 	}
 
 	problems, err := dbStore.ListProblems(filters)
 	if err != nil {
-		return model{}, err
+		return ProblemListModel{}, err
 	}
 
-	var choices []string
-	for _, p := range problems {
-		choices = append(choices, p.Title)
-	}
-
-	return model{
-		choices:  choices,
-		selected: make(map[int]struct{}),
+	return ProblemListModel{
+		choices:  problems,
+		selected: "",
 	}, nil
 }
 
-func (m model) Init() tea.Cmd {
+func (m ProblemListModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
-	// Is it a key press?
 	case tea.KeyPressMsg:
-
-		// Cool, what was the actual key pressed?
 		switch msg.String() {
 
-		// These keys should exit the program.
+		// Exit
 		case "ctrl+c", "q":
 			return m, tea.Quit
 
-		// The "up" and "k" keys move the cursor up
+		// Move up
 		case "up", "k":
 			if m.cursor > 0 {
 				m.cursor--
 			}
 
-		// The "down" and "j" keys move the cursor down
+		// Move down
 		case "down", "j":
 			if m.cursor < len(m.choices)-1 {
 				m.cursor++
 			}
 
-		// The enter key and the space bar toggle the selected state for the
-		// item that the cursor is pointing at.
+		// Select problem
 		case "enter", "space":
-			_, ok := m.selected[m.cursor]
-			if ok {
-				delete(m.selected, m.cursor)
-			} else {
-				m.selected[m.cursor] = struct{}{}
+			for _, c := range m.choices {
+				if c.Id == m.selected {
+					m.selected = ""
+				}
 			}
+			m.selected = m.choices[m.cursor].Id
 		}
 	}
 
-	// Return the updated model to the Bubble Tea runtime for processing.
-	// Note that we're not returning a command.
 	return m, nil
 }
 
-func (m model) View() tea.View {
-	s := "What should we buy at the market?\n\n"
+func (m ProblemListModel) View() tea.View {
+	s := "Select a problem that you would want to solve\n\n"
 
 	for i, choice := range m.choices {
 		cursor := " "
@@ -92,17 +81,18 @@ func (m model) View() tea.View {
 		}
 
 		checked := " "
-		if _, ok := m.selected[i]; ok {
+		if choice.Id == m.selected {
 			checked = "x"
 		}
 
-		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice)
+		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice.Title)
 	}
 
+	s += fmt.Sprintf("\nSelected Problem ID: %s\n", m.selected)
 	s += "\nPress q to quit.\n"
 
 	v := tea.NewView(s)
-	v.WindowTitle = "Grocery List"
+	v.WindowTitle = "Problem List"
 
 	return v
 }
