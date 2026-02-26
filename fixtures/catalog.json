@@ -1,0 +1,102 @@
+[
+  {
+    "source": "local",
+    "source_id": "two-sum",
+    "title": "Two Sum (0-based indices)",
+    "url": "https://example.com/problems/two-sum",
+    "difficulty": "easy",
+    "rating": 800,
+    "topics": ["arrays", "hashmap"],
+    "tags": ["two pointers"],
+    "statement_md": "# Two Sum\n\nGiven an array of integers and a target, return two 0-based indices i j such that a[i] + a[j] = target.\n\nInput:\n- n\n- n integers\n- target\n\nOutput:\n- i j\n\nAssume exactly one solution exists.\n",
+    "samples": [
+      {
+        "name": "sample1",
+        "in": "4\n2 7 11 15\n9\n",
+        "out": "0 1\n"
+      }
+    ]
+  },
+  {
+    "source": "local",
+    "source_id": "valid-parentheses",
+    "title": "Valid Parentheses",
+    "url": "https://example.com/problems/valid-parentheses",
+    "difficulty": "easy",
+    "rating": 900,
+    "topics": ["stacks", "strings"],
+    "tags": ["stack"],
+    "statement_md": "# Valid Parentheses\n\nGiven a string consisting of ()[]{} determine if it is valid.\n\nOutput YES if valid else NO.\n",
+    "samples": [
+      {
+        "name": "sample1",
+        "in": "([]){}\n",
+        "out": "YES\n"
+      },
+      {
+        "name": "sample2",
+        "in": "([)]\n",
+        "out": "NO\n"
+      }
+    ]
+  },
+  {
+    "source": "local",
+    "source_id": "fibonacci-mod",
+    "title": "Fibonacci Mod",
+    "url": "https://example.com/problems/fibonacci-mod",
+    "difficulty": "easy",
+    "rating": 1000,
+    "topics": ["dp", "math"],
+    "tags": ["iteration"],
+    "statement_md": "# Fibonacci Mod\n\nCompute F(n) mod 1,000,000,007 where F(0)=0, F(1)=1.\n\nInput: n\nOutput: F(n) mod 1e9+7\n",
+    "samples": [
+      {
+        "name": "sample1",
+        "in": "10\n",
+        "out": "55\n"
+      }
+    ]
+  },
+  {
+    "source": "local",
+    "source_id": "shortest-path-unweighted",
+    "title": "Shortest Path (Unweighted Graph)",
+    "url": "https://example.com/problems/shortest-path-unweighted",
+    "difficulty": "medium",
+    "rating": 1400,
+    "topics": ["graphs", "bfs"],
+    "tags": ["shortest path"],
+    "statement_md": "# Shortest Path (Unweighted)\n\nGiven an undirected unweighted graph, find the shortest distance from s to t.\n\nInput:\n- n m\n- m lines: u v (0-based)\n- s t\n\nOutput:\n- shortest distance (number of edges) or -1 if unreachable\n",
+    "samples": [
+      {
+        "name": "sample1",
+        "in": "5 5\n0 1\n1 2\n2 3\n3 4\n0 4\n0 3\n",
+        "out": "3\n"
+      },
+      {
+        "name": "sample2",
+        "in": "3 1\n0 1\n0 2\n",
+        "out": "-1\n"
+      }
+    ]
+  },
+  {
+    "source": "local",
+    "source_id": "lcs-length",
+    "title": "LCS Length",
+    "url": "https://example.com/problems/lcs-length",
+    "difficulty": "medium",
+    "rating": 1500,
+    "topics": ["dp", "strings"],
+    "tags": ["2D dp"],
+    "statement_md": "# LCS Length\n\nGiven two strings a and b, output the length of their longest common subsequence.\n\nInput:\n- a\n- b\n\nOutput:\n- integer length\n",
+    "samples": [
+      {
+        "name": "sample1",
+        "in": "abcde\nace\n",
+        "out": "3\n"
+      }
+    ]
+  }
+]

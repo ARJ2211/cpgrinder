@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/ARJ2211/cpgrinder/internal/platform"
 	"github.com/ARJ2211/cpgrinder/internal/store"
@@ -76,6 +77,26 @@ func main() {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
+
+	// Count of the problems at fresh db
+	c, err := dbStore.CountProblems()
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+	fmt.Println("COUNT OF PROBLEMS: " + strconv.Itoa(c))
+
+	// Upsert the fixtures from the catalog.json
+	if err := dbStore.UpsertProblemsFromFixture(); err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+	c1, err := dbStore.CountProblems()
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+	fmt.Println("COUNT OF PROBLEMS: " + strconv.Itoa(c1))
 
 	if err := dbStore.Close(); err != nil {
 		fmt.Println(err.Error())

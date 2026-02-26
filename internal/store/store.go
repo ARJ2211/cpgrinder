@@ -2,8 +2,13 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
+	"fmt"
+	"os"
 	"sync"
+	"time"
 
+	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
 )
 
@@ -160,4 +165,103 @@ func (s *Store) Close() error {
 	}
 
 	return err
+}
+
+/*
+Returns the total count of problems in the store
+*/
+func (s *Store) CountProblems() (int, error) {
+	var count int
+
+	row := s.db.QueryRow("SELECT COUNT(*) FROM problems")
+	if err := row.Scan(&count); err != nil {
+		return -1, err
+	}
+
+	return count, nil
+}
+
+/*
+Upserts fixtures into the db from the fixture/catalog.json or from
+the import flag.
+*/
+func (s *Store) UpsertProblemsFromFixture() error {
+	fmt.Println("UPSERT FIXTURES")
+	tx, _ := s.db.Begin()
+
+	var fixtures []ProblemJson
+
+	data, err := os.ReadFile("fixtures/catalog.json")
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(data, &fixtures)
+	if err != nil {
+		return err
+	}
+
+	for _, fixture := range fixtures {
+		fixtureID := uuid.New().String()
+		createdAt := time.Now().Unix()
+		updatedAt := createdAt
+
+		topicsBytes, err := json.Marshal(fixture.Topics)
+		if err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+		tagsBytes, err := json.Marshal(fixture.Tags)
+		if err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+		samplesBytes, err := json.Marshal(fixture.Samples)
+		if err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+
+		queryString := `
+		INSERT INTO problems(
+			id, source, source_id, title, url, difficulty, rating, topics, tags, statement_md, samples_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(source, source_id) DO UPDATE SET
+				title = excluded.title,
+				url = excluded.url,
+				difficulty = excluded.difficulty,
+				rating = excluded.rating,
+				topics = excluded.topics,
+				tags = excluded.tags,
+				statement_md = excluded.statement_md,
+				samples_json = excluded.samples_json,
+				updated_at = excluded.updated_at
+		`
+
+		_, err = tx.Exec(
+			queryString,
+			fixtureID,
+			fixture.Source,
+			fixture.SourceID,
+			fixture.Title,
+			fixture.URL,
+			fixture.Difficulty,
+			fixture.Rating,
+			string(topicsBytes),
+			string(tagsBytes),
+			fixture.StatementMd,
+			string(samplesBytes),
+			createdAt,
+			updatedAt,
+		)
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	return nil
 }
