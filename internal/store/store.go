@@ -282,11 +282,7 @@ This function give a list of problems that is currently stored
 in our database
 */
 func (s *Store) ListProblems(uf UserFilters) ([]Problem, error) {
-	if err := s.db.Ping(); err != nil {
-		return nil, err
-	}
-
-	query := `SELECT * FROM problems`
+	query := `SELECT id, source, title, url, difficulty, rating, topics, tags, created_at FROM problems`
 	var whereClauses []string
 	var args []interface{}
 
@@ -296,18 +292,18 @@ func (s *Store) ListProblems(uf UserFilters) ([]Problem, error) {
 	}
 
 	if uf.Difficulty != "" {
-		whereClauses = append(whereClauses, "difficult = ?")
+		whereClauses = append(whereClauses, "difficulty = ?")
 		args = append(args, uf.Difficulty)
 	}
 
 	if uf.Topic != "" {
-		whereClauses = append(whereClauses, "EXISTS (SELECT 1 FROM json_each(topics) WHERE value = ?)")
-		args = append(args, uf.Topic)
+		whereClauses = append(whereClauses, "topics LIKE ?")
+		args = append(args, "%\""+uf.Topic+"\"%")
 	}
 
 	if uf.Tag != "" {
-		whereClauses = append(whereClauses, "EXISTS (SELECT 1 FROM json_each(tags) WHERE value = ?)")
-		args = append(args, uf.Tag)
+		whereClauses = append(whereClauses, "tags LIKE ?")
+		args = append(args, "%\""+uf.Tag+"\"%")
 	}
 
 	if uf.Title != "" {
@@ -319,7 +315,7 @@ func (s *Store) ListProblems(uf UserFilters) ([]Problem, error) {
 		query += " WHERE " + strings.Join(whereClauses, " AND ")
 	}
 
-	if uf.Limit != 0 {
+	if uf.Limit > 0 {
 		query += " LIMIT ? "
 		args = append(args, uf.Limit)
 	}
@@ -332,26 +328,20 @@ func (s *Store) ListProblems(uf UserFilters) ([]Problem, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	for rows.Next() {
 		var p Problem
-
-		var sampleString string
 
 		var topicsString string
 		var tagsString string
 
 		if err := rows.Scan(
-			&p.Id, &p.Source, &p.SourceId,
+			&p.Id, &p.Source,
 			&p.Title, &p.Url, &p.Difficulty,
 			&p.Rating, &topicsString, &tagsString,
-			&p.StatementMd, &sampleString,
-			&p.CreatedAt, &p.UpdatedAt,
+			&p.CreatedAt,
 		); err != nil {
-			return nil, err
-		}
-
-		if err := json.Unmarshal([]byte(sampleString), &p.Samples); err != nil {
 			return nil, err
 		}
 
@@ -364,6 +354,10 @@ func (s *Store) ListProblems(uf UserFilters) ([]Problem, error) {
 		}
 
 		fetchedProblems = append(fetchedProblems, p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return fetchedProblems, nil

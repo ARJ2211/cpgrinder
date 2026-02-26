@@ -15,19 +15,15 @@ Unmarshalled structure of how a problem would
 be stored in the database
 */
 type Problem struct {
-	Id          string
-	Source      string
-	SourceId    string
-	Title       string
-	Url         string
-	Difficulty  string
-	Rating      int
-	Topics      []string
-	Tags        []string
-	StatementMd string
-	Samples     []Sample
-	CreatedAt   int
-	UpdatedAt   int
+	Id         string
+	Source     string
+	Title      string
+	Url        string
+	Difficulty string
+	Rating     int
+	Topics     []string
+	Tags       []string
+	CreatedAt  int
 }
 
 /*
