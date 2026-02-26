@@ -7,10 +7,9 @@ import (
 	"os"
 
 	tea "charm.land/bubbletea/v2"
-
 	"github.com/ARJ2211/cpgrinder/internal/platform"
 	"github.com/ARJ2211/cpgrinder/internal/store"
-	"github.com/ARJ2211/cpgrinder/tui"
+	"github.com/ARJ2211/cpgrinder/tui/problem_list"
 )
 
 type globalFlags struct {
@@ -73,7 +72,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	m, err := tui.InitialModel(dbStore)
+	m, err := problem_list.InitialModel(dbStore)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -81,6 +80,19 @@ func main() {
 
 	// Clear terminal screen
 	fmt.Print("\033[H\033[2J")
+
+	// uf := store.UserFilters{
+	// 	Limit:  10,
+	// 	Offset: 20,
+	// }
+	// p, err := dbStore.ListProblems(uf)
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// 	os.Exit(1)
+	// }
+	// for _, s := range p {
+	// 	fmt.Println(s.Id)
+	// }
 
 	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {

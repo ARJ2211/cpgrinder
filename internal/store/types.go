@@ -58,4 +58,5 @@ type UserFilters struct {
 	Topic      string // Single topic filter
 	Tag        string // Single tag filter
 	Limit      int
+	Offset     int
 }

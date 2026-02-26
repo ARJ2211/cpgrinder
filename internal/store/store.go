@@ -319,6 +319,11 @@ func (s *Store) ListProblems(uf UserFilters) ([]Problem, error) {
 		args = append(args, uf.Limit)
 	}
 
+	if uf.Offset > 0 {
+		query += " OFFSET ? "
+		args = append(args, uf.Offset)
+	}
+
 	var fetchedProblems []Problem
 
 	rows, err := s.db.Query(query, args...)

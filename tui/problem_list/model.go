@@ -1,4 +1,4 @@
-package tui
+package problem_list
 
 import (
 	"fmt"
@@ -8,9 +8,10 @@ import (
 )
 
 type ProblemListModel struct {
-	dbStore  store.Store     // dbStore
+	dbStore  *store.Store    // dbStore
 	choices  []store.Problem // List of problems
 	cursor   int             // The position of the problem
+	page     int             // Pagination offset
 	selected string          // The ID of the problem
 }
 
@@ -26,8 +27,10 @@ func InitialModel(dbStore *store.Store) (ProblemListModel, error) {
 	}
 
 	return ProblemListModel{
+		dbStore:  dbStore,
 		choices:  problems,
 		selected: "",
+		page:     0,
 	}, nil
 }
 
@@ -65,6 +68,52 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.selected = m.choices[m.cursor].Id
+
+		// Increment page by 1
+		case "n", "right":
+			for _, c := range m.choices {
+				if c.Id == m.selected {
+					m.selected = ""
+				}
+			}
+
+			m.page = m.page + 1
+
+			uf := store.UserFilters{
+				Limit:  30,
+				Offset: 30 * m.page,
+			}
+
+			var err error
+			m.choices, err = m.dbStore.ListProblems(uf)
+
+			if err != nil {
+				return ProblemListModel{}, nil
+			}
+
+		// Decrement page by 1
+		case "b", "left":
+			for _, c := range m.choices {
+				if c.Id == m.selected {
+					m.selected = ""
+				}
+			}
+
+			if m.page > 0 {
+				m.page = m.page - 1
+			}
+
+			uf := store.UserFilters{
+				Limit:  30,
+				Offset: 30 * m.page,
+			}
+
+			var err error
+			m.choices, err = m.dbStore.ListProblems(uf)
+
+			if err != nil {
+				return ProblemListModel{}, nil
+			}
 		}
 	}
 
