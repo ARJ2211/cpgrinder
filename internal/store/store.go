@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -374,7 +375,7 @@ func (s *Store) GetProblemByID(id string) (ProblemID, error) {
 	var tagString string
 	var sampleString string
 
-	row := s.db.QueryRow("SELECT * FROM problems WHERE id = ?", id)
+	row := s.db.QueryRow("SELECT id, source, source_id, title, url, difficulty, rating, topics, tags, statement_md, samples_json, created_at, updated_at FROM problems WHERE id = ?", id)
 	if row.Err() != nil {
 		return ProblemID{}, row.Err()
 	}
@@ -385,6 +386,9 @@ func (s *Store) GetProblemByID(id string) (ProblemID, error) {
 		&topicString, &tagString, &pID.StatementMd,
 		&sampleString, &pID.CreatedAt, &pID.updatedAt,
 	); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return ProblemID{}, errors.New("no problem with id " + id + " found")
+		}
 		return ProblemID{}, err
 	}
 
