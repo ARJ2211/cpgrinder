@@ -98,6 +98,21 @@ func main() {
 	}
 	fmt.Println("COUNT OF UPSERTED PROBLEMS: " + strconv.Itoa(c1))
 
+	// List Problems that are there in the database
+	problems, err := dbStore.ListProblems(6)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+	for i, p := range problems {
+		fmt.Println(strconv.Itoa(i + 1))
+		fmt.Println(p.Title, p.CreatedAt)
+		for j, s := range p.Samples {
+			fmt.Print("sample " + strconv.Itoa(j+1) + ": ")
+			fmt.Println(s)
+		}
+	}
+
 	if err := dbStore.Close(); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)

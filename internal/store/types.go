@@ -26,6 +26,8 @@ type Problem struct {
 	Tags        []string
 	StatementMd string
 	Samples     []Sample
+	CreatedAt   int
+	UpdatedAt   int
 }
 
 /*

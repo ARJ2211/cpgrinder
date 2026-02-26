@@ -3,7 +3,6 @@ package store
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -186,7 +185,6 @@ Upserts fixtures into the db from the fixture/catalog.json or from
 the import flag.
 */
 func (s *Store) UpsertProblemsFromFixture(fixturePath string) error {
-	fmt.Println("UPSERT FIXTURES")
 	tx, _ := s.db.Begin()
 
 	var fixtures []ProblemJson
@@ -280,3 +278,50 @@ func (s *Store) UpsertProblemsFromFixture(fixturePath string) error {
 This function give a list of problems that is currently stored
 in our database
 */
+func (s *Store) ListProblems(limit int) ([]Problem, error) {
+	if err := s.db.Ping(); err != nil {
+		return nil, err
+	}
+
+	var fetchedProblems []Problem
+
+	rows, err := s.db.Query(`SELECT * FROM problems LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var p Problem
+
+		var sampleString string
+
+		var topicsString string
+		var tagsString string
+
+		if err := rows.Scan(
+			&p.Id, &p.Source, &p.SourceId,
+			&p.Title, &p.Url, &p.Difficulty,
+			&p.Rating, &topicsString, &tagsString,
+			&p.StatementMd, &sampleString,
+			&p.CreatedAt, &p.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal([]byte(sampleString), &p.Samples); err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal([]byte(topicsString), &p.Topics); err != nil {
+			return nil, err
+		}
+
+		if err := json.Unmarshal([]byte(tagsString), &p.Tags); err != nil {
+			return nil, err
+		}
+
+		fetchedProblems = append(fetchedProblems, p)
+	}
+
+	return fetchedProblems, nil
+}
