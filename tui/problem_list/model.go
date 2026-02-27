@@ -4,7 +4,9 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
+
 	"github.com/ARJ2211/cpgrinder/internal/store"
+	"github.com/ARJ2211/cpgrinder/tui/styles"
 )
 
 type ProblemListModel struct {
@@ -13,6 +15,7 @@ type ProblemListModel struct {
 	cursor   int             // The position of the problem
 	page     int             // Pagination offset
 	selected string          // The ID of the problem
+	count    int             // Count of the total problems
 }
 
 // Initialize it with a list of problems in the database
@@ -26,11 +29,17 @@ func InitialModel(dbStore *store.Store) (ProblemListModel, error) {
 		return ProblemListModel{}, err
 	}
 
+	count, err := dbStore.CountProblems()
+	if err != nil {
+		return ProblemListModel{}, err
+	}
+
 	return ProblemListModel{
 		dbStore:  dbStore,
 		choices:  problems,
 		selected: "",
 		page:     0,
+		count:    count,
 	}, nil
 }
 
@@ -62,12 +71,17 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Select problem
 		case "enter", "space":
+			var prevSelection string
 			for _, c := range m.choices {
 				if c.Id == m.selected {
+					prevSelection = m.selected
 					m.selected = ""
 				}
 			}
-			m.selected = m.choices[m.cursor].Id
+
+			if prevSelection != m.choices[m.cursor].Id {
+				m.selected = m.choices[m.cursor].Id
+			}
 
 		// Increment page by 1
 		case "n", "right":
@@ -76,8 +90,9 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.selected = ""
 				}
 			}
-
-			m.page = m.page + 1
+			if (m.page+1)*30 < m.count {
+				m.page = m.page + 1
+			}
 
 			uf := store.UserFilters{
 				Limit:  30,
@@ -90,6 +105,8 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err != nil {
 				return ProblemListModel{}, nil
 			}
+
+			m.cursor = 0
 
 		// Decrement page by 1
 		case "b", "left":
@@ -114,6 +131,8 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err != nil {
 				return ProblemListModel{}, nil
 			}
+
+			m.cursor = 0
 		}
 	}
 
@@ -137,8 +156,11 @@ func (m ProblemListModel) View() tea.View {
 		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice.Title)
 	}
 
+	s += fmt.Sprintf("\nProblem: (%d/%d)", m.cursor+(m.page*30)+1, m.count)
 	s += fmt.Sprintf("\nSelected Problem ID: %s\n", m.selected)
-	s += "\nPress q to quit.\n"
+
+	legend := styles.LegendStyle.Render("Legend: [↑/↓] Navigate | [Enter] Select | [q] Quit | [n/→] Next | [b/←] Back")
+	s += legend
 
 	v := tea.NewView(s)
 	v.WindowTitle = "Problem List"
