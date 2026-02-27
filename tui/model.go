@@ -173,5 +173,4 @@ func (m MainModel) View() tea.View {
 		v.WindowTitle = "CpGrinder"
 		return v
 	}
-
 }

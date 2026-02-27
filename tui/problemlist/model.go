@@ -4,10 +4,13 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 
 	"github.com/ARJ2211/cpgrinder/internal/store"
 	"github.com/ARJ2211/cpgrinder/tui/styles"
 )
+
+var PAGE_LIMIT int = 40
 
 type ProblemListModel struct {
 	dbStore  *store.Store    // dbStore
@@ -16,12 +19,14 @@ type ProblemListModel struct {
 	page     int             // Pagination offset
 	selected string          // The ID of the problem
 	count    int             // Count of the total problems
+
+	problemStmt string // Problem statement
 }
 
 // Initialize it with a list of problems in the database
 func InitializeModel(dbStore *store.Store) (ProblemListModel, error) {
 	filters := store.UserFilters{
-		Limit: 30,
+		Limit: PAGE_LIMIT,
 	}
 
 	problems, err := dbStore.ListProblems(filters)
@@ -35,11 +40,12 @@ func InitializeModel(dbStore *store.Store) (ProblemListModel, error) {
 	}
 
 	return ProblemListModel{
-		dbStore:  dbStore,
-		choices:  problems,
-		selected: "",
-		page:     0,
-		count:    count,
+		dbStore:     dbStore,
+		choices:     problems,
+		selected:    "",
+		page:        0,
+		count:       count,
+		problemStmt: "",
 	}, nil
 }
 
@@ -76,11 +82,19 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if c.Id == m.selected {
 					prevSelection = m.selected
 					m.selected = ""
+					m.problemStmt = ""
 				}
 			}
 
 			if prevSelection != m.choices[m.cursor].Id {
 				m.selected = m.choices[m.cursor].Id
+
+				p, err := m.dbStore.GetProblemByID(m.selected)
+				if err != nil {
+					return ProblemListModel{}, nil
+				}
+
+				m.problemStmt = p.StatementMd
 			}
 
 		// Increment page by 1
@@ -90,13 +104,13 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.selected = ""
 				}
 			}
-			if (m.page+1)*30 < m.count {
+			if (m.page+1)*PAGE_LIMIT < m.count {
 				m.page = m.page + 1
 			}
 
 			uf := store.UserFilters{
-				Limit:  30,
-				Offset: 30 * m.page,
+				Limit:  PAGE_LIMIT,
+				Offset: PAGE_LIMIT * m.page,
 			}
 
 			var err error
@@ -121,8 +135,8 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			uf := store.UserFilters{
-				Limit:  30,
-				Offset: 30 * m.page,
+				Limit:  PAGE_LIMIT,
+				Offset: PAGE_LIMIT * m.page,
 			}
 
 			var err error
@@ -156,11 +170,18 @@ func (m ProblemListModel) View() tea.View {
 		s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice.Title)
 	}
 
-	s += fmt.Sprintf("\nProblem: (%d/%d)", m.cursor+(m.page*30)+1, m.count)
+	s += fmt.Sprintf("\nProblem: (%d/%d)", m.cursor+(m.page*PAGE_LIMIT)+1, m.count)
 	s += fmt.Sprintf("\nSelected Problem ID: %s\n", m.selected)
 
 	legend := styles.LegendStyle.Render("Legend: [↑/↓] Navigate | [Enter] Select | [q] Quit | [n/→] Next | [b/←] Back")
 	s += legend
+
+	p, err := styles.GlamourMD.Render(m.problemStmt)
+	if err != nil {
+		s = "FAILED TO RENDER MARKDOWN"
+	}
+
+	s = lipgloss.JoinHorizontal(lipgloss.Left, s, p)
 
 	v := tea.NewView(s)
 	v.WindowTitle = "Problem List"
