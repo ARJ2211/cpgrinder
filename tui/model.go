@@ -165,7 +165,11 @@ func (m MainModel) View() tea.View {
 
 	// Default case when some random state is passed
 	default:
-		v := tea.NewView("Unknown state\n")
+		msg := fmt.Sprintf(
+			"%s is not yet implemented... Coming soon :)",
+			m.stateChoices[m.cursor],
+		)
+		v := tea.NewView(msg)
 		v.WindowTitle = "CpGrinder"
 		return v
 	}
