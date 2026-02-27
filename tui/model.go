@@ -14,6 +14,7 @@ type sessionState int
 const (
 	projectView sessionState = iota
 	problemlistView
+	notImplemented
 )
 
 type MainModel struct {
@@ -82,6 +83,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "enter", "space":
 				if m.cursor == 0 {
 					m.state = problemlistView
+				} else {
+					m.state = notImplemented
 				}
 				return m, nil
 			}
@@ -109,6 +112,20 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			return m, cmd
+
+		//When the state is not yet implemented
+		case notImplemented:
+			switch msg.String() {
+
+			// Exit
+			case "ctrl+c", "q":
+				return m, tea.Quit
+
+			// Go back to the prev screen
+			case "esc":
+				m.state = projectView
+				return m, nil
+			}
 		}
 	}
 
