@@ -46,9 +46,7 @@ func InitializeModel(dbStore *store.Store) (MainModel, error) {
 	}, nil
 }
 
-func (m MainModel) Init() tea.Cmd {
-	return nil
-}
+func (m MainModel) Init() tea.Cmd { return nil }
 
 func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -57,47 +55,53 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.width = msg.Width
 
+		if m.state == problemlistView {
+			updated, cmd := m.promblemListView.Update(msg)
+			if lm, ok := updated.(problemlist.ProblemListModel); ok {
+				m.promblemListView = lm
+				return m, cmd
+			}
+		}
+		return m, nil
+
 	case tea.KeyPressMsg:
 		switch m.state {
 
-		// When state is the project view (HOME PAGE)
 		case projectView:
 			switch msg.String() {
-			// Exit
 			case "ctrl+c", "q":
 				return m, tea.Quit
 
-			// Move up
 			case "up", "k":
 				if m.cursor > 0 {
 					m.cursor--
 				}
 
-			// Move down
 			case "down", "j":
 				if m.cursor < len(m.stateChoices)-1 {
 					m.cursor++
 				}
 
-			// Slection of view
 			case "enter", "space":
 				if m.cursor == 0 {
 					m.state = problemlistView
-				} else {
-					m.state = notImplemented
+
+					ws := tea.WindowSizeMsg{Width: m.width, Height: m.height}
+					updated, cmd := m.promblemListView.Update(ws)
+					if lm, ok := updated.(problemlist.ProblemListModel); ok {
+						m.promblemListView = lm
+					}
+					return m, cmd
 				}
+
+				m.state = notImplemented
 				return m, nil
 			}
 
-		// When the state is the list problems view
 		case problemlistView:
 			switch msg.String() {
-
-			// Exit
 			case "ctrl+c", "q":
 				return m, tea.Quit
-
-			// Go back to the prev screen
 			case "esc":
 				m.state = projectView
 				return m, nil
@@ -106,22 +110,16 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			updated, cmd := m.promblemListView.Update(msg)
 			if lm, ok := updated.(problemlist.ProblemListModel); ok {
 				m.promblemListView = lm
-			} else {
-				m.state = projectView
-				return m, nil
+				return m, cmd
 			}
 
-			return m, cmd
+			m.state = projectView
+			return m, nil
 
-		//When the state is not yet implemented
 		case notImplemented:
 			switch msg.String() {
-
-			// Exit
 			case "ctrl+c", "q":
 				return m, tea.Quit
-
-			// Go back to the prev screen
 			case "esc":
 				m.state = projectView
 				return m, nil
@@ -135,7 +133,6 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m MainModel) View() tea.View {
 	switch m.state {
 
-	// View controller given to the home screen
 	case projectView:
 		s := "Welcome to CpGrinder - Your terminal based competitive coding platform\n\n"
 		s += "Please select what you would like to do today! \n\n"
@@ -152,23 +149,15 @@ func (m MainModel) View() tea.View {
 			}
 
 			s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice)
-
 		}
 
-		v := tea.NewView(s)
-		return v
+		return tea.NewView(s)
 
-	// View controller given to the problem list view
 	case problemlistView:
-		v := m.promblemListView.View()
-		return v
+		return m.promblemListView.View()
 
-	// Default case when some random state is passed
 	default:
-		msg := fmt.Sprintf(
-			"%s is not yet implemented... Coming soon :)",
-			m.stateChoices[m.cursor],
-		)
+		msg := fmt.Sprintf("%s is not yet implemented... Coming soon :)", m.stateChoices[m.cursor])
 		v := tea.NewView(msg)
 		v.WindowTitle = "CpGrinder"
 		return v
