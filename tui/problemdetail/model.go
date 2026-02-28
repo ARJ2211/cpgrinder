@@ -27,7 +27,7 @@ type ProblemDetailModel struct {
 
 	viewport viewport.Model
 
-	// computed locally so we don't depend on viewport internals
+	// computed locally
 	totalLines int
 	viewH      int
 }

@@ -6,9 +6,20 @@ import (
 )
 
 var (
+	// Convert (\\){2,}\leq -> \leq  (works for \\leq, \\\\leq, etc)
+	reMultiSlashCmd = regexp.MustCompile(`(\\){2,}([A-Za-z])`)
+
+	// \(...\) and \[...\] outside $...$
+	reParenMath = regexp.MustCompile(`\\\((.*?)\\\)`)
+	reBrackMath = regexp.MustCompile(`\\\[(.*?)\\\]`)
+
 	reText = regexp.MustCompile(`\\text\{([^{}]*)\}`)
 	reFrac = regexp.MustCompile(`\\frac\{([^{}]+)\}\{([^{}]+)\}`)
-	reCmd  = regexp.MustCompile(`\\([A-Za-z]+)`)
+	reSub  = regexp.MustCompile(`_\{([^{}]+)\}`)
+	reSup  = regexp.MustCompile(`\^\{([^{}]+)\}`)
+
+	// Any remaining \COMMAND
+	reCmd = regexp.MustCompile(`\\([A-Za-z]+)`)
 )
 
 func HumanizeMathInMarkdown(md string) string {
@@ -18,6 +29,7 @@ func HumanizeMathInMarkdown(md string) string {
 	for i := 0; i < len(lines); i++ {
 		line := lines[i]
 		trim := strings.TrimSpace(line)
+
 		if strings.HasPrefix(trim, "```") {
 			inFence = !inFence
 			continue
@@ -25,13 +37,25 @@ func HumanizeMathInMarkdown(md string) string {
 		if inFence {
 			continue
 		}
-		lines[i] = replaceInlineMath(line)
+
+		// Handle \(...\) and \[...\] outside $...$
+		line = reParenMath.ReplaceAllStringFunc(line, func(m string) string {
+			inner := m[len(`\(`) : len(m)-len(`\)`)]
+			return humanizeLatex(inner)
+		})
+		line = reBrackMath.ReplaceAllStringFunc(line, func(m string) string {
+			inner := m[len(`\[`) : len(m)-len(`\]`)]
+			return humanizeLatex(inner)
+		})
+
+		// Handle $...$ and $$...$$
+		lines[i] = replaceDollarMath(line)
 	}
 
 	return strings.Join(lines, "\n")
 }
 
-func replaceInlineMath(s string) string {
+func replaceDollarMath(s string) string {
 	var out strings.Builder
 	var expr strings.Builder
 
@@ -41,7 +65,6 @@ func replaceInlineMath(s string) string {
 	i := 0
 	for i < len(s) {
 		if s[i] == '$' && !isEscaped(s, i) {
-			// detect $ vs $$
 			d := "$"
 			if i+1 < len(s) && s[i+1] == '$' {
 				d = "$$"
@@ -56,7 +79,6 @@ func replaceInlineMath(s string) string {
 			}
 
 			if inMath && d == delim {
-				// close
 				out.WriteString(humanizeLatex(expr.String()))
 				inMath = false
 				delim = ""
@@ -65,7 +87,7 @@ func replaceInlineMath(s string) string {
 				continue
 			}
 
-			// mismatched delimiter inside math, treat as literal
+			// mismatched delimiter inside math -> keep literal
 			expr.WriteString(d)
 			i += len(d)
 			continue
@@ -79,7 +101,6 @@ func replaceInlineMath(s string) string {
 		i++
 	}
 
-	// if unclosed, keep original text
 	if inMath {
 		out.WriteString(delim)
 		out.WriteString(expr.String())
@@ -89,7 +110,6 @@ func replaceInlineMath(s string) string {
 }
 
 func isEscaped(s string, idx int) bool {
-	// count preceding backslashes; odd => escaped
 	n := 0
 	for j := idx - 1; j >= 0 && s[j] == '\\'; j-- {
 		n++
@@ -103,74 +123,86 @@ func humanizeLatex(expr string) string {
 		return ""
 	}
 
-	// Codeforces sometimes puts macro definitions at the top; just drop them.
+	// 1) normalize \\leq, \\\\dots, etc -> \leq, \dots
+	// replacement must be ONE backslash + the letter
+	e = reMultiSlashCmd.ReplaceAllString(e, "\\$2")
+
+	// 2) drop \def macro lines (they're noise in terminal)
 	if strings.Contains(e, `\def\`) {
-		return ""
+		var kept []string
+		for _, ln := range strings.Split(e, "\n") {
+			if strings.Contains(ln, `\def\`) {
+				continue
+			}
+			kept = append(kept, ln)
+		}
+		e = strings.TrimSpace(strings.Join(kept, " "))
+		if e == "" {
+			return ""
+		}
 	}
 
-	// TeX line breaks
-	e = strings.ReplaceAll(e, `\\`, "\n")
+	// 3) TeX linebreak \\ -> space
+	e = strings.ReplaceAll(e, `\\`, " ")
 
-	// unwrap common constructs repeatedly
-	for iter := 0; iter < 6; iter++ {
+	// 4) unwrap common constructs a few times
+	for iter := 0; iter < 8; iter++ {
 		next := e
 		next = reText.ReplaceAllString(next, "$1")
 		next = reFrac.ReplaceAllString(next, "($1/$2)")
+		next = reSub.ReplaceAllString(next, "_$1")
+		next = reSup.ReplaceAllString(next, "^$1")
 		if next == e {
 			break
 		}
 		e = next
 	}
 
-	// common symbol replacements
+	// 5) replacements (include \leq/\dots/\times etc)
 	repl := map[string]string{
-		`\\le`: "≤", `\le`: "≤",
-		`\\ge`: "≥", `\ge`: "≥",
-		`\\lt`: "<", `\lt`: "<",
-		`\\gt`: ">", `\gt`: ">",
-		`\\in`: "∈", `\in`: "∈",
+		`\leqslant`: "≤", `\geqslant`: "≥",
+		`\leq`: "≤", `\geq`: "≥",
+		`\le`: "≤", `\ge`: "≥",
+		`\lt`: "<", `\gt`: ">",
 
-		`\\dots`: "...", `\dots`: "...",
-		`\\ldots`: "...", `\ldots`: "...",
-		`\\cdots`: "...", `\cdots`: "...",
+		`\neq`: "≠", `\ne`: "≠",
+		`\approx`: "≈",
+		`\pm`:     "±",
 
-		`\\cdot`: "·", `\cdot`: "·",
-		`\\times`: "×", `\times`: "×",
+		`\in`:   "∈",
+		`\dots`: "...", `\ldots`: "...", `\cdots`: "...",
+		`\cdot`: "·", `\times`: "×",
 
-		`\\rightarrow`: "->", `\rightarrow`: "->",
-		`\\to`: "->", `\to`: "->",
+		`\rightarrow`: "->", `\to`: "->",
 
-		`\\left`: "", `\left`: "",
-		`\\right`: "", `\right`: "",
+		`\left`: "", `\right`: "",
+
+		// spacing commands
+		`\,`: " ", `\;`: " ", `\:`: " ",
 	}
 	for k, v := range repl {
 		e = strings.ReplaceAll(e, k, v)
 	}
 
-	// bracket/brace escapes often show as \[1,2\] or \{...\}
+	// common escapes
+	e = strings.ReplaceAll(e, `\_`, "_")
 	e = strings.ReplaceAll(e, `\[`, "[")
 	e = strings.ReplaceAll(e, `\]`, "]")
 	e = strings.ReplaceAll(e, `\{`, "{")
 	e = strings.ReplaceAll(e, `\}`, "}")
 
-	// common escapes
-	e = strings.ReplaceAll(e, `\_`, "_")
-
-	// strip remaining commands like \RED, \BLUE, \text (if any are left)
+	// 6) strip leftover commands (\RED -> RED, \alpha -> alpha)
 	e = reCmd.ReplaceAllString(e, "$1")
 
-	// remove grouping braces after we handled frac/text
-	e = strings.ReplaceAll(e, "{", "")
-	e = strings.ReplaceAll(e, "}", "")
-
-	// normalize whitespace a bit
+	// normalize whitespace
 	e = strings.ReplaceAll(e, "\t", " ")
 	for strings.Contains(e, "  ") {
 		e = strings.ReplaceAll(e, "  ", " ")
 	}
 	e = strings.TrimSpace(e)
 
-	// prevent markdown italics for variables like a_i
+	// 7) stop markdown italics in the final rendered markdown
+	// Glamour will show the underscore without italicizing.
 	e = strings.ReplaceAll(e, "_", `\_`)
 
 	return e
