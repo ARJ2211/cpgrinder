@@ -36,12 +36,13 @@ type ProblemListModel struct {
 	leftW  int
 	rightW int
 	focus  focusPane
+
+	// ensures we auto-load the initial selection only once (and after sizing)
+	detailLoaded bool
 }
 
 func InitializeModel(dbStore *store.Store) (ProblemListModel, error) {
-	filters := store.UserFilters{
-		Limit: PAGE_LIMIT,
-	}
+	filters := store.UserFilters{Limit: PAGE_LIMIT}
 
 	problems, err := dbStore.ListProblems(filters)
 	if err != nil {
@@ -53,15 +54,23 @@ func InitializeModel(dbStore *store.Store) (ProblemListModel, error) {
 		return ProblemListModel{}, err
 	}
 
-	return ProblemListModel{
+	m := ProblemListModel{
 		dbStore:     dbStore,
 		choices:     problems,
-		selected:    "",
 		page:        0,
 		count:       count,
 		problemStmt: pdm.New(dbStore),
 		focus:       focusList,
-	}, nil
+		cursor:      0,
+		selected:    "",
+	}
+
+	// preselect first item (if any). we will load details after we know pane size.
+	if len(problems) > 0 {
+		m.selected = problems[0].Id
+	}
+
+	return m, nil
 }
 
 func (m ProblemListModel) Init() tea.Cmd { return nil }
@@ -73,7 +82,6 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		// Make right pane a bit narrower by giving list more width
 		m.leftW = clamp(int(float64(m.width)*0.45), 38, 72)
 
 		sepW := 1
@@ -86,13 +94,27 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		// Right pane wrapper uses Padding(0,1) so inner content width shrinks by 2
-		innerW := m.rightW - 2
+		innerW := m.rightW - 2 // right pane padding(0,1)
 		if innerW < 20 {
 			innerW = 20
 		}
 
 		m.problemStmt = m.problemStmt.SetSize(innerW, m.height)
+
+		// auto-render the preselected problem once sizing is known
+		if !m.detailLoaded && m.selected != "" {
+			detail, err := m.problemStmt.LoadProblem(m.selected)
+			if err != nil {
+				m.problemStmt = m.problemStmt.
+					Clear().
+					SetMessage("failed to load problem: "+err.Error()).
+					SetSize(innerW, m.height)
+			} else {
+				m.problemStmt = detail.SetSize(innerW, m.height)
+				m.detailLoaded = true
+			}
+		}
+
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -152,6 +174,7 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected = ""
 				m.problemStmt = m.problemStmt.Clear()
 				m.focus = focusList
+				m.detailLoaded = false
 				return m, nil
 			}
 
@@ -163,11 +186,13 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					SetMessage("failed to load problem: "+err.Error()).
 					SetSize(max(20, m.rightW-2), m.height)
 				m.focus = focusList
+				m.detailLoaded = false
 				return m, nil
 			}
 
 			m.problemStmt = detail
 			m.focus = focusDetail
+			m.detailLoaded = true
 			return m, nil
 
 		case "n", "right":
@@ -192,10 +217,33 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+			// reset list state
 			m.cursor = 0
-			m.selected = ""
-			m.problemStmt = m.problemStmt.Clear()
 			m.focus = focusList
+			m.detailLoaded = false
+
+			// preselect first on new page + render it immediately
+			m.problemStmt = m.problemStmt.Clear()
+			m.selected = ""
+			if len(m.choices) > 0 {
+				m.selected = m.choices[0].Id
+
+				innerW := max(20, m.rightW-2) // right pane padding(0,1)
+				m.problemStmt = m.problemStmt.SetSize(innerW, m.height)
+
+				detail, derr := m.problemStmt.LoadProblem(m.selected)
+				if derr != nil {
+					m.problemStmt = m.problemStmt.
+						Clear().
+						SetMessage("failed to load problem: "+derr.Error()).
+						SetSize(innerW, m.height)
+					m.detailLoaded = false
+				} else {
+					m.problemStmt = detail.SetSize(innerW, m.height)
+					m.detailLoaded = true
+				}
+			}
+
 			return m, nil
 
 		case "b", "left":
@@ -220,10 +268,33 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+			// reset list state
 			m.cursor = 0
-			m.selected = ""
-			m.problemStmt = m.problemStmt.Clear()
 			m.focus = focusList
+			m.detailLoaded = false
+
+			// preselect first on new page + render it immediately
+			m.problemStmt = m.problemStmt.Clear()
+			m.selected = ""
+			if len(m.choices) > 0 {
+				m.selected = m.choices[0].Id
+
+				innerW := max(20, m.rightW-2)
+				m.problemStmt = m.problemStmt.SetSize(innerW, m.height)
+
+				detail, derr := m.problemStmt.LoadProblem(m.selected)
+				if derr != nil {
+					m.problemStmt = m.problemStmt.
+						Clear().
+						SetMessage("failed to load problem: "+derr.Error()).
+						SetSize(innerW, m.height)
+					m.detailLoaded = false
+				} else {
+					m.problemStmt = detail.SetSize(innerW, m.height)
+					m.detailLoaded = true
+				}
+			}
+
 			return m, nil
 		}
 	}
@@ -250,7 +321,7 @@ func (m ProblemListModel) renderLeftPane() string {
 		focusTxt = "detail"
 	}
 
-	b.WriteString("Question Bank: \n\n")
+	b.WriteString("Question Bank:\n\n")
 
 	for i, choice := range m.choices {
 		cursor := " "
@@ -270,7 +341,10 @@ func (m ProblemListModel) renderLeftPane() string {
 		b.WriteString(fmt.Sprintf("\n(%d/%d)", m.cursor+(m.page*PAGE_LIMIT)+1, m.count))
 	}
 
-	legend := fmt.Sprintf("focus=%s | [tab] switch | \n[↑/↓] move/scroll | [enter] select | \n[n/b] page | [esc] back | [q] quit", focusTxt)
+	legend := fmt.Sprintf(
+		"focus=%s | [tab] switch focus\n[↑/↓] move/scroll | [enter] select\n[n/b] page | [esc] back | [q] quit",
+		focusTxt,
+	)
 	b.WriteString("\n\n")
 	b.WriteString(styles.LegendStyle.Render(legend))
 

@@ -60,7 +60,11 @@ func (m ProblemDetailModel) View() tea.View {
 	header := m.renderHeader()
 	footer := m.renderFooter()
 	content := lipgloss.JoinVertical(lipgloss.Top, header, m.viewport.View(), footer)
-	return tea.NewView(content)
+
+	v := tea.NewView(content)
+	v.WindowTitle = "Problem Detail"
+
+	return v
 }
 
 func (m ProblemDetailModel) SetSize(width, height int) ProblemDetailModel {
