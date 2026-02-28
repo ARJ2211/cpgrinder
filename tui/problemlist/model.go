@@ -2,6 +2,7 @@ package problemlist
 
 import (
 	"fmt"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -21,14 +22,14 @@ const (
 )
 
 type ProblemListModel struct {
-	dbStore  *store.Store    // dbStore
-	choices  []store.Problem // List of problems
-	cursor   int             // The position of the problem
-	page     int             // Pagination offset
-	selected string          // The ID of the problem
-	count    int             // Count of the total problems
+	dbStore  *store.Store
+	choices  []store.Problem
+	cursor   int
+	page     int
+	selected string
+	count    int
 
-	problemStmt pdm.ProblemDetailModel // Problem statement
+	problemStmt pdm.ProblemDetailModel
 
 	width  int
 	height int
@@ -37,7 +38,6 @@ type ProblemListModel struct {
 	focus  focusPane
 }
 
-// Initialize it with a list of problems in the database
 func InitializeModel(dbStore *store.Store) (ProblemListModel, error) {
 	filters := store.UserFilters{
 		Limit: PAGE_LIMIT,
@@ -64,9 +64,7 @@ func InitializeModel(dbStore *store.Store) (ProblemListModel, error) {
 	}, nil
 }
 
-func (m ProblemListModel) Init() tea.Cmd {
-	return nil
-}
+func (m ProblemListModel) Init() tea.Cmd { return nil }
 
 func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
@@ -74,12 +72,27 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.leftW = clamp(m.width/3, 32, 56)
-		m.rightW = m.width - m.leftW - 1
-		if m.rightW < 20 {
-			m.rightW = 20
+
+		// Make right pane a bit narrower by giving list more width
+		m.leftW = clamp(int(float64(m.width)*0.45), 38, 72)
+
+		sepW := 1
+		m.rightW = m.width - m.leftW - sepW
+		if m.rightW < 24 {
+			m.rightW = 24
+			m.leftW = m.width - m.rightW - sepW
+			if m.leftW < 20 {
+				m.leftW = 20
+			}
 		}
-		m.problemStmt = m.problemStmt.SetSize(m.rightW, m.height)
+
+		// Right pane wrapper uses Padding(0,1) so inner content width shrinks by 2
+		innerW := m.rightW - 2
+		if innerW < 20 {
+			innerW = 20
+		}
+
+		m.problemStmt = m.problemStmt.SetSize(innerW, m.height)
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -88,7 +101,7 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 
-		case "tab":
+		case "tab", "ctrl+i", "shift+tab":
 			if m.focus == focusList {
 				m.focus = focusDetail
 			} else {
@@ -105,6 +118,7 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor > 0 {
 				m.cursor--
 			}
+			return m, nil
 
 		case "down", "j":
 			if m.focus == focusDetail {
@@ -115,6 +129,7 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cursor < len(m.choices)-1 {
 				m.cursor++
 			}
+			return m, nil
 
 		case "pgup", "pgdown", "home", "end", "g", "G":
 			if m.focus == focusDetail {
@@ -122,6 +137,7 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.problemStmt = updated.(pdm.ProblemDetailModel)
 				return m, cmd
 			}
+			return m, nil
 
 		case "enter", "space":
 			if m.focus == focusDetail {
@@ -135,6 +151,7 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.selected == id {
 				m.selected = ""
 				m.problemStmt = m.problemStmt.Clear()
+				m.focus = focusList
 				return m, nil
 			}
 
@@ -144,9 +161,11 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.problemStmt = m.problemStmt.
 					Clear().
 					SetMessage("failed to load problem: "+err.Error()).
-					SetSize(m.rightW, m.height)
+					SetSize(max(20, m.rightW-2), m.height)
+				m.focus = focusList
 				return m, nil
 			}
+
 			m.problemStmt = detail
 			m.focus = focusDetail
 			return m, nil
@@ -158,15 +177,8 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 
-			for _, c := range m.choices {
-				if c.Id == m.selected {
-					m.selected = ""
-					m.problemStmt = m.problemStmt.Clear()
-				}
-			}
-
 			if (m.page+1)*PAGE_LIMIT < m.count {
-				m.page = m.page + 1
+				m.page++
 			}
 
 			uf := store.UserFilters{
@@ -177,11 +189,14 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var err error
 			m.choices, err = m.dbStore.ListProblems(uf)
 			if err != nil {
-				return ProblemListModel{}, nil
+				return m, nil
 			}
 
 			m.cursor = 0
+			m.selected = ""
+			m.problemStmt = m.problemStmt.Clear()
 			m.focus = focusList
+			return m, nil
 
 		case "b", "left":
 			if m.focus == focusDetail {
@@ -190,15 +205,8 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, cmd
 			}
 
-			for _, c := range m.choices {
-				if c.Id == m.selected {
-					m.selected = ""
-					m.problemStmt = m.problemStmt.Clear()
-				}
-			}
-
 			if m.page > 0 {
-				m.page = m.page - 1
+				m.page--
 			}
 
 			uf := store.UserFilters{
@@ -209,11 +217,14 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var err error
 			m.choices, err = m.dbStore.ListProblems(uf)
 			if err != nil {
-				return ProblemListModel{}, nil
+				return m, nil
 			}
 
 			m.cursor = 0
+			m.selected = ""
+			m.problemStmt = m.problemStmt.Clear()
 			m.focus = focusList
+			return m, nil
 		}
 	}
 
@@ -222,17 +233,24 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m ProblemListModel) View() tea.View {
 	left := m.renderLeftPane()
+	sep := m.renderSeparator()
 	right := m.renderRightPane()
 
-	content := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+	content := lipgloss.JoinHorizontal(lipgloss.Top, left, sep, right)
 	v := tea.NewView(content)
 	v.WindowTitle = "Problem List"
 	return v
 }
 
 func (m ProblemListModel) renderLeftPane() string {
-	var b string
-	b = "List of questions currently in the question bank: \n\n"
+	var b strings.Builder
+
+	focusTxt := "list"
+	if m.focus == focusDetail {
+		focusTxt = "detail"
+	}
+
+	b.WriteString("Practice\n\n")
 
 	for i, choice := range m.choices {
 		cursor := " "
@@ -245,42 +263,50 @@ func (m ProblemListModel) renderLeftPane() string {
 			checked = "x"
 		}
 
-		b += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice.Title)
+		b.WriteString(fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice.Title))
 	}
 
 	if m.count > 0 {
-		b += fmt.Sprintf("\n(%d/%d)", m.cursor+(m.page*PAGE_LIMIT)+1, m.count)
+		b.WriteString(fmt.Sprintf("\n(%d/%d)", m.cursor+(m.page*PAGE_LIMIT)+1, m.count))
 	}
 
-	legend := "[tab] focus | [↑/↓] move/scroll | [enter] select | [n/b] page | [esc] back | [q] quit"
+	legend := fmt.Sprintf("focus=%s | [tab] switch | [↑/↓] move/scroll | [enter] select | [n/b] page | [esc] back | [q] quit", focusTxt)
+	b.WriteString("\n\n")
+	b.WriteString(styles.LegendStyle.Render(legend))
 
-	b += "\n\n"
-	b += styles.LegendStyle.Render(legend)
-
-	border := lipgloss.NewStyle().
+	style := lipgloss.NewStyle().
 		Width(m.leftW).
 		Height(m.height).
-		Padding(0, 1).
-		Border(lipgloss.NormalBorder(), false, true, false, false)
+		Padding(0, 1)
 
-	if m.focus == focusList {
-		border = border.BorderForeground(lipgloss.Color("62"))
+	return style.Render(b.String())
+}
+
+func (m ProblemListModel) renderSeparator() string {
+	var b strings.Builder
+	for i := 0; i < m.height; i++ {
+		b.WriteString("│")
+		if i < m.height-1 {
+			b.WriteByte('\n')
+		}
 	}
 
-	return border.Render(b)
+	// Just tint the separator based on focus (no layout changes)
+	col := lipgloss.Color("240")
+	if m.focus == focusDetail {
+		col = lipgloss.Color("62")
+	}
+
+	return lipgloss.NewStyle().Foreground(col).Render(b.String())
 }
 
 func (m ProblemListModel) renderRightPane() string {
-	right := lipgloss.NewStyle().
+	style := lipgloss.NewStyle().
 		Width(m.rightW).
 		Height(m.height).
 		Padding(0, 1)
 
-	if m.focus == focusDetail {
-		right = right.Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("62"))
-	}
-
-	return right.Render(m.problemStmt.View().Content)
+	return style.Render(m.problemStmt.View().Content)
 }
 
 func clamp(v, lo, hi int) int {
@@ -291,4 +317,11 @@ func clamp(v, lo, hi int) int {
 		return hi
 	}
 	return v
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
