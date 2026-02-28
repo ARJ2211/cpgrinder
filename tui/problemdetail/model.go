@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/glamour"
 
 	"github.com/ARJ2211/cpgrinder/internal/store"
+	texlite "github.com/ARJ2211/cpgrinder/internal/textlite"
 )
 
 type ProblemDetailModel struct {
@@ -174,6 +175,7 @@ func (m ProblemDetailModel) renderAndSetContent() ProblemDetailModel {
 	}
 
 	md := strings.TrimSpace(m.rawMD)
+	md = texlite.HumanizeMathInMarkdown(md)
 	if md == "" {
 		md = "(no statement found for this problem)"
 	}

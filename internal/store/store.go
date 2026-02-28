@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"math/rand"
 	"os"
 	"slices"
 	"strings"
@@ -12,6 +13,8 @@ import (
 	"github.com/google/uuid"
 	_ "modernc.org/sqlite"
 )
+
+const RAND_SEED = 42069 // NICE
 
 /*
 Struct to help store the DB Store properties.
@@ -188,6 +191,8 @@ the import flag.
 */
 func (s *Store) UpsertProblemsFromFixture(fixturePath string) error {
 	tx, _ := s.db.Begin()
+	source := rand.NewSource(RAND_SEED)
+	r := rand.New(source)
 
 	var fixtures []ProblemJson
 
@@ -210,6 +215,10 @@ func (s *Store) UpsertProblemsFromFixture(fixturePath string) error {
 	if err != nil {
 		return err
 	}
+
+	r.Shuffle(len(fixtures), func(i, j int) {
+		fixtures[i], fixtures[j] = fixtures[j], fixtures[i]
+	})
 
 	for _, fixture := range fixtures {
 		fixtureID := uuid.New().String()
@@ -406,4 +415,49 @@ func (s *Store) GetProblemByID(id string) (ProblemID, error) {
 	}
 
 	return pID, nil
+}
+
+/*
+Helper to count the problems with the set filter
+*/
+func (s *Store) CountProblemsWithFilters(uf UserFilters) (int, error) {
+	query := `SELECT COUNT(*) FROM problems`
+	var whereClauses []string
+	var args []interface{}
+
+	if uf.Source != "" && slices.Contains([]string{"codeforces", "leetcode"}, uf.Source) {
+		whereClauses = append(whereClauses, "source = ?")
+		args = append(args, uf.Source)
+	}
+
+	if uf.Difficulty != "" {
+		whereClauses = append(whereClauses, "difficulty = ?")
+		args = append(args, uf.Difficulty)
+	}
+
+	if uf.Topic != "" {
+		whereClauses = append(whereClauses, "topics LIKE ?")
+		args = append(args, "%\""+uf.Topic+"\"%")
+	}
+
+	if uf.Tag != "" {
+		whereClauses = append(whereClauses, "tags LIKE ?")
+		args = append(args, "%\""+uf.Tag+"\"%")
+	}
+
+	if uf.Title != "" {
+		whereClauses = append(whereClauses, "title LIKE ?")
+		args = append(args, "%"+uf.Title+"%")
+	}
+
+	if len(whereClauses) > 0 {
+		query += " WHERE " + strings.Join(whereClauses, " AND ")
+	}
+
+	var count int
+	row := s.db.QueryRow(query, args...)
+	if err := row.Scan(&count); err != nil {
+		return -1, err
+	}
+	return count, nil
 }
