@@ -12,7 +12,7 @@ import (
 	"github.com/ARJ2211/cpgrinder/tui/styles"
 )
 
-var PAGE_LIMIT int = 40
+var PAGE_LIMIT int = 30
 
 type focusPane int
 
@@ -250,7 +250,7 @@ func (m ProblemListModel) renderLeftPane() string {
 		focusTxt = "detail"
 	}
 
-	b.WriteString("Practice\n\n")
+	b.WriteString("Question Bank: \n\n")
 
 	for i, choice := range m.choices {
 		cursor := " "
@@ -270,7 +270,7 @@ func (m ProblemListModel) renderLeftPane() string {
 		b.WriteString(fmt.Sprintf("\n(%d/%d)", m.cursor+(m.page*PAGE_LIMIT)+1, m.count))
 	}
 
-	legend := fmt.Sprintf("focus=%s | [tab] switch | [↑/↓] move/scroll | [enter] select | [n/b] page | [esc] back | [q] quit", focusTxt)
+	legend := fmt.Sprintf("focus=%s | [tab] switch | \n[↑/↓] move/scroll | [enter] select | \n[n/b] page | [esc] back | [q] quit", focusTxt)
 	b.WriteString("\n\n")
 	b.WriteString(styles.LegendStyle.Render(legend))
 
@@ -285,13 +285,12 @@ func (m ProblemListModel) renderLeftPane() string {
 func (m ProblemListModel) renderSeparator() string {
 	var b strings.Builder
 	for i := 0; i < m.height; i++ {
-		b.WriteString("│")
+		b.WriteString("|")
 		if i < m.height-1 {
 			b.WriteByte('\n')
 		}
 	}
 
-	// Just tint the separator based on focus (no layout changes)
 	col := lipgloss.Color("240")
 	if m.focus == focusDetail {
 		col = lipgloss.Color("62")
@@ -317,11 +316,4 @@ func clamp(v, lo, hi int) int {
 		return hi
 	}
 	return v
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }

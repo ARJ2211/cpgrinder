@@ -25,15 +25,22 @@ type ProblemDetailModel struct {
 	height int
 
 	viewport viewport.Model
+
+	// computed locally so we don't depend on viewport internals
+	totalLines int
+	viewH      int
 }
 
 func New(dbStore *store.Store) ProblemDetailModel {
 	vp := viewport.New()
+	vp.YPosition = 0
 	vp.SetContent("Select a problem to preview its statement")
 
 	return ProblemDetailModel{
-		dbStore:  dbStore,
-		viewport: vp,
+		dbStore:    dbStore,
+		viewport:   vp,
+		totalLines: 1,
+		viewH:      0,
 	}
 }
 
@@ -51,7 +58,8 @@ func (m ProblemDetailModel) View() tea.View {
 	}
 
 	header := m.renderHeader()
-	content := lipgloss.JoinVertical(lipgloss.Top, header, m.viewport.View())
+	footer := m.renderFooter()
+	content := lipgloss.JoinVertical(lipgloss.Top, header, m.viewport.View(), footer)
 	return tea.NewView(content)
 }
 
@@ -67,15 +75,23 @@ func (m ProblemDetailModel) SetSize(width, height int) ProblemDetailModel {
 	m.width = width
 	m.height = height
 
-	headerH := m.headerHeight()
-	viewportH := height - headerH
-	if viewportH < 1 {
-		viewportH = 1
+	headerH := 0
+	footerH := 0
+	if m.problemID != "" {
+		headerH = 3
+		footerH = 2
 	}
 
-	m.viewport.SetWidth(width)
-	m.viewport.SetHeight(viewportH)
+	vh := height - headerH - footerH
+	if vh < 1 {
+		vh = 1
+	}
+	m.viewH = vh
 
+	m.viewport.SetWidth(width)
+	m.viewport.SetHeight(vh)
+
+	// re-wrap markdown when width changes
 	if prevW != width && m.problemID != "" {
 		m = m.renderAndSetContent()
 	}
@@ -89,7 +105,14 @@ func (m ProblemDetailModel) Clear() ProblemDetailModel {
 	m.url = ""
 	m.difficulty = ""
 	m.rawMD = ""
-	m = m.SetMessage("Select a problem to preview its statement")
+	m.totalLines = 1
+
+	m.viewport.SetContent("Select a problem to preview its statement")
+	m.viewport.GotoTop()
+
+	// header/footer removed, expand viewport back
+	m = m.SetSize(m.width, m.height)
+
 	return m
 }
 
@@ -98,6 +121,7 @@ func (m ProblemDetailModel) SetMessage(msg string) ProblemDetailModel {
 		msg = " "
 	}
 	m.viewport.SetContent(msg)
+	m.totalLines = countLines(msg)
 	m.viewport.GotoTop()
 	return m
 }
@@ -118,6 +142,9 @@ func (m ProblemDetailModel) LoadProblem(id string) (ProblemDetailModel, error) {
 	m.difficulty = p.Difficulty
 	m.rawMD = p.StatementMd
 
+	// header/footer now exist, so resize viewport accordingly
+	m = m.SetSize(m.width, m.height)
+
 	m = m.renderAndSetContent()
 	m.viewport.GotoTop()
 
@@ -136,7 +163,9 @@ func (m ProblemDetailModel) renderAndSetContent() ProblemDetailModel {
 		glamour.WithChromaFormatter(">"),
 	)
 	if err != nil {
-		m.viewport.SetContent("failed to init markdown renderer")
+		msg := "failed to init markdown renderer"
+		m.viewport.SetContent(msg)
+		m.totalLines = countLines(msg)
 		return m
 	}
 
@@ -147,31 +176,70 @@ func (m ProblemDetailModel) renderAndSetContent() ProblemDetailModel {
 
 	rendered, err := r.Render(md)
 	if err != nil {
-		m.viewport.SetContent("failed to render markdown")
+		msg := "failed to render markdown"
+		m.viewport.SetContent(msg)
+		m.totalLines = countLines(msg)
 		return m
 	}
 
 	m.viewport.SetContent(rendered)
+	m.totalLines = countLines(rendered)
 	return m
 }
 
-func (m ProblemDetailModel) headerHeight() int {
-	return 3
-}
-
 func (m ProblemDetailModel) renderHeader() string {
-	if m.problemID == "" {
-		return lipgloss.NewStyle().Width(m.width).Render("")
+	if m.problemID == "" || m.width <= 0 {
+		return ""
 	}
 
-	maxW := m.width
-	if maxW < 10 {
-		maxW = 10
-	}
-
-	title := lipgloss.NewStyle().Width(maxW).Render(m.title)
-	meta := lipgloss.NewStyle().Width(maxW).Render(fmt.Sprintf("%s  %s", m.difficulty, m.url))
-	sep := lipgloss.NewStyle().Width(maxW).Render(strings.Repeat("─", maxW))
+	w := m.width
+	title := fitLine(m.title, w)
+	meta := fitLine(fmt.Sprintf("%s  %s", m.difficulty, m.url), w)
+	sep := strings.Repeat("─", w)
 
 	return lipgloss.JoinVertical(lipgloss.Top, title, meta, sep)
+}
+
+func (m ProblemDetailModel) renderFooter() string {
+	if m.problemID == "" || m.width <= 0 {
+		return ""
+	}
+
+	w := m.width
+	sep := strings.Repeat("─", w)
+
+	pct := int(m.viewport.ScrollPercent()*100 + 0.5)
+
+	maxTop := m.totalLines - m.viewH
+	if maxTop < 0 {
+		maxTop = 0
+	}
+	top0 := int(m.viewport.ScrollPercent() * float64(maxTop))
+	top := top0 + 1
+	bot := top0 + m.viewH
+	if bot > m.totalLines {
+		bot = m.totalLines
+	}
+
+	line := fmt.Sprintf("%3d%%  %d-%d/%d", pct, top, bot, m.totalLines)
+	line = fitLine(line, w)
+
+	return sep + "\n" + line
+}
+
+func countLines(s string) int {
+	if s == "" {
+		return 1
+	}
+	return strings.Count(s, "\n") + 1
+}
+
+func fitLine(s string, w int) string {
+	if w <= 0 {
+		return ""
+	}
+	if len(s) > w {
+		return s[:w]
+	}
+	return s + strings.Repeat(" ", w-len(s))
 }
