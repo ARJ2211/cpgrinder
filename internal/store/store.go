@@ -45,6 +45,7 @@ func Open(dbPath, workspacePath string) (*Store, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, errors.New("workspace path is invalid")
 	}
+	s.workspacePath = workspacePath
 
 	var pramgaStmts = []string{
 		"PRAGMA foreign_keys = ON",
@@ -169,6 +170,13 @@ func (s *Store) Close() error {
 	}
 
 	return err
+}
+
+/*
+Fetch the workspace path
+*/
+func (s *Store) WorkspacePath() string {
+	return s.workspacePath
 }
 
 /*
