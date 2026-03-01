@@ -21,6 +21,7 @@ type ProblemDetailModel struct {
 	url        string
 	difficulty string
 	rawMD      string
+	samples    []store.Sample
 
 	width  int
 	height int
@@ -64,7 +65,6 @@ func (m ProblemDetailModel) View() tea.View {
 
 	v := tea.NewView(content)
 	v.WindowTitle = "Problem Detail"
-
 	return v
 }
 
@@ -110,6 +110,7 @@ func (m ProblemDetailModel) Clear() ProblemDetailModel {
 	m.url = ""
 	m.difficulty = ""
 	m.rawMD = ""
+	m.samples = nil
 	m.totalLines = 1
 
 	m.viewport.SetContent("Select a problem to preview its statement")
@@ -146,6 +147,7 @@ func (m ProblemDetailModel) LoadProblem(id string) (ProblemDetailModel, error) {
 	m.url = p.Url
 	m.difficulty = p.Difficulty
 	m.rawMD = p.StatementMd
+	m.samples = p.Samples
 
 	// header/footer now exist, so resize viewport accordingly
 	m = m.SetSize(m.width, m.height)
@@ -175,10 +177,15 @@ func (m ProblemDetailModel) renderAndSetContent() ProblemDetailModel {
 	}
 
 	md := strings.TrimSpace(m.rawMD)
-	md = texlite.HumanizeMathInMarkdown(md)
 	if md == "" {
 		md = "(no statement found for this problem)"
 	}
+
+	// Append samples as markdown (fenced code blocks)
+	md = md + samplesToMarkdown(m.samples)
+
+	// Humanize LaTeX-ish bits
+	md = texlite.HumanizeMathInMarkdown(md)
 
 	rendered, err := r.Render(md)
 	if err != nil {
@@ -191,6 +198,34 @@ func (m ProblemDetailModel) renderAndSetContent() ProblemDetailModel {
 	m.viewport.SetContent(rendered)
 	m.totalLines = countLines(rendered)
 	return m
+}
+
+func samplesToMarkdown(samples []store.Sample) string {
+	if len(samples) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n\n# Samples\n")
+
+	for _, s := range samples {
+		name := strings.TrimSpace(s.Name)
+		if name == "" {
+			name = "sample"
+		}
+
+		b.WriteString("\n### ")
+		b.WriteString(name)
+		b.WriteString("\n\nInput\n\n```")
+		b.WriteString("\n")
+		b.WriteString(strings.TrimSuffix(s.In, "\n"))
+		b.WriteString("\n```\n\nOutput\n\n```")
+		b.WriteString("\n")
+		b.WriteString(strings.TrimSuffix(s.Out, "\n"))
+		b.WriteString("\n```\n")
+	}
+
+	return b.String()
 }
 
 func (m ProblemDetailModel) renderHeader() string {
