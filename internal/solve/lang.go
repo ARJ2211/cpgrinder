@@ -169,11 +169,14 @@ func javaSpec() LanguageSpec {
 		SourceFile:   "Main.java",
 		TemplatePath: "templates/java/Main.java.tmpl",
 
-		IsCompiled:      true,
-		BuildDir:        ".build",
-		CompileArgv:     []string{"javac", "-d", ".build", "Main.java"},
+		IsCompiled: true,
+		BuildDir:   ".build",
+
+		// compile to Java 8 bytecode so even older java runtimes can run it
+		CompileArgv: []string{"javac", "-source", "8", "-target", "8", "-d", ".build", "Main.java"},
+
 		RunCmd:          []string{"java", "-cp", ".build", "Main"},
 		DefaultTimeout:  2 * time.Second,
-		ArtifactRelPath: "", // class files
+		ArtifactRelPath: "",
 	}
 }
