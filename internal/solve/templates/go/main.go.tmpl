@@ -1,0 +1,33 @@
+# internal/solve/templates/go/main.go.tmpl
+package main
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+func main() {
+	in := bufio.NewScanner(os.Stdin)
+	in.Buffer(make([]byte, 1024), 1<<20)
+	in.Split(bufio.ScanWords)
+
+	next := func() (string, bool) {
+		if !in.Scan() {
+			return "", false
+		}
+		return in.Text(), true
+	}
+
+	out := bufio.NewWriterSize(os.Stdout, 1<<20)
+	defer out.Flush()
+
+	_ = next
+	_ = fmt.Fprintln
+
+	// TODO: parse + implement
+	// Example:
+	// tok, ok := next()
+	// if !ok { return }
+	// fmt.Fprintln(out, tok)
+}

@@ -16,65 +16,53 @@ const (
 	LangJava       LanguageID = "java"
 )
 
-/*
-Language specifications that we will need
-to run the different codes.
-*/
 type LanguageSpec struct {
 	ID             LanguageID
 	DisplayName    string
-	SourceFile     string        // The file that needs to be opened
-	TemplatePath   string        // The path to the template for that language (embed path, use forward slashes)
-	RunCmd         []string      // CMD to run the file for that language
-	DefaultTimeout time.Duration // In case of infinite loops etc.
+	SourceFile     string        // file to edit
+	TemplatePath   string        // embed path, forward slashes
+	RunCmd         []string      // argv to execute (relative OK)
+	DefaultTimeout time.Duration // per run
 
-	// ------------ OPTIONAL -------------
+	// compiled languages
 	IsCompiled      bool
-	BuildDir        string // default for now .build
-	CompileArgv     []string
-	ArtifactRelPath string // for cpp later (ex: ".build/main")
+	BuildDir        string   // default ".build" for compiled
+	CompileArgv     []string // argv to compile
+	ArtifactRelPath string   // optional: ".build/main"
 }
 
-// stable order (useful for a language picker later)
+// stable order (useful for picker later)
 var languageOrder = []LanguageID{
 	LangPython3,
-	// add more later in the order you want them displayed
+	LangJavaScript,
+	LangCPP,
+	LangGo,
+	LangJava,
 }
 
-// registry (initialized once)
+// registry
 var specMap = map[LanguageID]LanguageSpec{
-	LangPython3: python3Spec(),
-	// add more later: LangJavaScript: jsSpec(), etc.
+	LangPython3:    python3Spec(),
+	LangJavaScript: jsSpec(),
+	LangCPP:        cppSpec(),
+	LangGo:         goSpec(),
+	LangJava:       javaSpec(),
 }
 
-/*
-Easier to parse configs
-*/
 func NormalizeLanguageID(s string) LanguageID {
 	s = strings.TrimSpace(s)
 	s = strings.ToLower(s)
 	return LanguageID(s)
 }
 
-/*
-Get the default language
-*/
-func DefaultLanguage() LanguageID {
-	return LangPython3
-}
+func DefaultLanguage() LanguageID { return LangPython3 }
 
-/*
-List languages in a stable order (useful for UI later)
-*/
 func ListLanguageIDs() []LanguageID {
 	out := make([]LanguageID, len(languageOrder))
 	copy(out, languageOrder)
 	return out
 }
 
-/*
-List specs in stable order (useful for UI later)
-*/
 func ListLanguageSpecs() []LanguageSpec {
 	out := make([]LanguageSpec, 0, len(languageOrder))
 	for _, id := range languageOrder {
@@ -85,9 +73,6 @@ func ListLanguageSpecs() []LanguageSpec {
 	return out
 }
 
-/*
-This will return the registered spec for the id
-*/
 func GetLanguageSpec(id LanguageID) (LanguageSpec, bool) {
 	id = NormalizeLanguageID(string(id))
 
@@ -95,32 +80,23 @@ func GetLanguageSpec(id LanguageID) (LanguageSpec, bool) {
 	if !ok {
 		return LanguageSpec{}, false
 	}
-
 	return applyDefaults(spec), true
 }
 
 func applyDefaults(spec LanguageSpec) LanguageSpec {
-	// timeouts
 	if spec.DefaultTimeout == 0 {
 		spec.DefaultTimeout = 2 * time.Second
 	}
-	// build dir default (for compiled langs later)
 	if spec.BuildDir == "" && spec.IsCompiled {
 		spec.BuildDir = ".build"
 	}
 	return spec
 }
 
-/*
-Tiny helper to return the full path to the solution file
-*/
 func (s LanguageSpec) SourcePath(problemDir string) string {
 	return filepath.Join(problemDir, s.SourceFile)
 }
 
-/*
-Helper function to return the compiled path if there is any
-*/
 func (s LanguageSpec) ArtifactPath(problemDir string) string {
 	if strings.TrimSpace(s.ArtifactRelPath) == "" {
 		return ""
@@ -128,9 +104,8 @@ func (s LanguageSpec) ArtifactPath(problemDir string) string {
 	return filepath.Join(problemDir, s.ArtifactRelPath)
 }
 
-// ------------------ MAP BUILDER FOR THE SPECS -----------------
+// ------------------ SPECS ------------------
 
-// PYTHON 3 SPEC
 func python3Spec() LanguageSpec {
 	return LanguageSpec{
 		ID:             LangPython3,
@@ -139,10 +114,66 @@ func python3Spec() LanguageSpec {
 		TemplatePath:   "templates/python3/main.py.tmpl",
 		RunCmd:         []string{"python3", "main.py"},
 		DefaultTimeout: 2 * time.Second,
+		IsCompiled:     false,
+	}
+}
 
-		IsCompiled:      false,
-		BuildDir:        "",
-		CompileArgv:     nil,
-		ArtifactRelPath: "",
+func jsSpec() LanguageSpec {
+	return LanguageSpec{
+		ID:             LangJavaScript,
+		DisplayName:    "JavaScript (Node)",
+		SourceFile:     "main.js",
+		TemplatePath:   "templates/javascript/main.js.tmpl",
+		RunCmd:         []string{"node", "main.js"},
+		DefaultTimeout: 2 * time.Second,
+		IsCompiled:     false,
+	}
+}
+
+func cppSpec() LanguageSpec {
+	return LanguageSpec{
+		ID:           LangCPP,
+		DisplayName:  "C++",
+		SourceFile:   "main.cpp",
+		TemplatePath: "templates/cpp/main.cpp.tmpl",
+
+		IsCompiled:      true,
+		BuildDir:        ".build",
+		CompileArgv:     []string{"g++", "main.cpp", "-O2", "-std=c++17", "-o", ".build/main"},
+		RunCmd:          []string{"./.build/main"},
+		DefaultTimeout:  2 * time.Second,
+		ArtifactRelPath: ".build/main",
+	}
+}
+
+func goSpec() LanguageSpec {
+	return LanguageSpec{
+		ID:           LangGo,
+		DisplayName:  "Go",
+		SourceFile:   "main.go",
+		TemplatePath: "templates/go/main.go.tmpl",
+
+		IsCompiled:      true,
+		BuildDir:        ".build",
+		CompileArgv:     []string{"go", "build", "-o", ".build/main", "main.go"},
+		RunCmd:          []string{"./.build/main"},
+		DefaultTimeout:  2 * time.Second,
+		ArtifactRelPath: ".build/main",
+	}
+}
+
+func javaSpec() LanguageSpec {
+	return LanguageSpec{
+		ID:           LangJava,
+		DisplayName:  "Java",
+		SourceFile:   "Main.java",
+		TemplatePath: "templates/java/Main.java.tmpl",
+
+		IsCompiled:      true,
+		BuildDir:        ".build",
+		CompileArgv:     []string{"javac", "-d", ".build", "Main.java"},
+		RunCmd:          []string{"java", "-cp", ".build", "Main"},
+		DefaultTimeout:  2 * time.Second,
+		ArtifactRelPath: "", // class files
 	}
 }

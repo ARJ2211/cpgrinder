@@ -1,4 +1,3 @@
-// internal/solve/runner.go
 package solve
 
 import (
@@ -8,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -23,7 +24,7 @@ type RunResult struct {
 
 type RunOptions struct {
 	Dir     string
-	Argv    []string // e.g. ["python3", "main.py"]
+	Argv    []string
 	Stdin   []byte
 	Timeout time.Duration
 	Env     map[string]string // optional overrides
@@ -81,7 +82,6 @@ func RunCommand(ctx context.Context, opts RunOptions) (RunResult, error) {
 		return res, nil
 	}
 
-	// If we get here, the process likely didn't start (bad binary, permission, etc.)
 	res.ExitCode = -1
 	return res, err
 }
@@ -126,15 +126,113 @@ func RequireBinary(name string) error {
 	return nil
 }
 
-func RunPython3(ctx context.Context, dir string, stdin []byte, timeout time.Duration) (RunResult, error) {
-	if err := RequireBinary("python3"); err != nil {
+/*
+Runs any registered language spec.
+If spec.IsCompiled, it compiles every time for now (no caching yet).
+*/
+func RunWithSpec(ctx context.Context, spec LanguageSpec, dir string, stdin []byte, timeoutOverride time.Duration) (RunResult, error) {
+	spec = applyDefaults(spec)
+
+	runTimeout := spec.DefaultTimeout
+	if timeoutOverride > 0 {
+		runTimeout = timeoutOverride
+	}
+
+	if spec.IsCompiled {
+		if err := os.MkdirAll(filepath.Join(dir, spec.BuildDir), 0o755); err != nil {
+			return RunResult{}, err
+		}
+		if len(spec.CompileArgv) == 0 {
+			return RunResult{}, fmt.Errorf("compile argv missing for %s", spec.ID)
+		}
+
+		if err := requireIfOnPath(spec.CompileArgv[0]); err != nil {
+			return RunResult{}, err
+		}
+
+		compileRes, err := RunCommand(ctx, RunOptions{
+			Dir:     dir,
+			Argv:    spec.CompileArgv,
+			Stdin:   nil,
+			Timeout: 10 * time.Second,
+		})
+		if err != nil {
+			return compileRes, err
+		}
+		if compileRes.TimedOut || compileRes.ExitCode != 0 {
+			// Treat as "ran but failed" so UI can show compiler stderr.
+			// (You can label this as CE later in compare.go)
+			if strings.TrimSpace(compileRes.Stderr) != "" {
+				compileRes.Stderr = "compile failed:\n" + compileRes.Stderr
+			} else {
+				compileRes.Stderr = "compile failed"
+			}
+			return compileRes, nil
+		}
+	}
+
+	if len(spec.RunCmd) == 0 {
+		return RunResult{}, fmt.Errorf("run argv missing for %s", spec.ID)
+	}
+	if err := requireIfOnPath(spec.RunCmd[0]); err != nil {
 		return RunResult{}, err
 	}
 
 	return RunCommand(ctx, RunOptions{
 		Dir:     dir,
-		Argv:    []string{"python3", "main.py"},
+		Argv:    spec.RunCmd,
 		Stdin:   stdin,
-		Timeout: timeout,
+		Timeout: runTimeout,
 	})
+}
+
+func requireIfOnPath(prog string) error {
+	// If it looks like a path (contains a slash or starts with "."), don't LookPath.
+	// Examples: "./.build/main", ".build/main"
+	if strings.ContainsAny(prog, `/\`) || strings.HasPrefix(prog, ".") {
+		return nil
+	}
+	return RequireBinary(prog)
+}
+
+// Convenience wrappers
+
+func RunPython3(ctx context.Context, dir string, stdin []byte, timeout time.Duration) (RunResult, error) {
+	spec, ok := GetLanguageSpec(LangPython3)
+	if !ok {
+		return RunResult{}, fmt.Errorf("unknown language: %s", LangPython3)
+	}
+	return RunWithSpec(ctx, spec, dir, stdin, timeout)
+}
+
+func RunJavaScript(ctx context.Context, dir string, stdin []byte, timeout time.Duration) (RunResult, error) {
+	spec, ok := GetLanguageSpec(LangJavaScript)
+	if !ok {
+		return RunResult{}, fmt.Errorf("unknown language: %s", LangJavaScript)
+	}
+	return RunWithSpec(ctx, spec, dir, stdin, timeout)
+}
+
+func RunCPP(ctx context.Context, dir string, stdin []byte, timeout time.Duration) (RunResult, error) {
+	spec, ok := GetLanguageSpec(LangCPP)
+	if !ok {
+		return RunResult{}, fmt.Errorf("unknown language: %s", LangCPP)
+	}
+	return RunWithSpec(ctx, spec, dir, stdin, timeout)
+}
+
+func RunGo(ctx context.Context, dir string, stdin []byte, timeout time.Duration) (RunResult, error) {
+	spec, ok := GetLanguageSpec(LangGo)
+	if !ok {
+		return RunResult{}, fmt.Errorf("unknown language: %s", LangGo)
+	}
+	return RunWithSpec(ctx, spec, dir, stdin, timeout)
+}
+
+func RunJava(ctx context.Context, dir string, stdin []byte, timeout time.Duration) (RunResult, error) {
+	spec, ok := GetLanguageSpec(LangJava)
+	if !ok {
+		return RunResult{}, fmt.Errorf("unknown language: %s", LangJava)
+	}
+	return RunWithSpec(ctx, spec, dir, stdin, timeout)
 }

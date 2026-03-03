@@ -1,0 +1,66 @@
+# internal/solve/templates/java/Main.java.tmpl
+import java.io.*;
+import java.util.*;
+
+public class Main {
+
+    static class FastScanner {
+        private final InputStream in;
+        private final byte[] buffer = new byte[1 << 16];
+        private int ptr = 0, len = 0;
+
+        FastScanner(InputStream is) {
+            this.in = is;
+        }
+
+        private int readByte() throws IOException {
+            if (ptr >= len) {
+                len = in.read(buffer);
+                ptr = 0;
+                if (len <= 0) return -1;
+            }
+            return buffer[ptr++];
+        }
+
+        String next() throws IOException {
+            StringBuilder sb = new StringBuilder();
+            int c;
+            do {
+                c = readByte();
+                if (c == -1) return null;
+            } while (c <= 32);
+
+            while (c > 32) {
+                sb.append((char) c);
+                c = readByte();
+                if (c == -1) break;
+            }
+            return sb.toString();
+        }
+
+        int nextInt() throws IOException {
+            String s = next();
+            if (s == null) throw new EOFException();
+            return Integer.parseInt(s);
+        }
+
+        long nextLong() throws IOException {
+            String s = next();
+            if (s == null) throw new EOFException();
+            return Long.parseLong(s);
+        }
+    }
+
+    public static void main(String[] args) throws Exception {
+        FastScanner fs = new FastScanner(System.in);
+        PrintWriter out = new PrintWriter(new BufferedWriter(new OutputStreamWriter(System.out)));
+
+        // TODO: parse + implement using fs.next(), fs.nextInt(), fs.nextLong()
+        // Example:
+        // String a = fs.next();
+        // if (a == null) { out.flush(); return; }
+        // out.println(a);
+
+        out.flush();
+    }
+}
