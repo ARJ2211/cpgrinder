@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 )
@@ -24,18 +23,13 @@ TemplateForLanguage returns (
 ).
 */
 func TemplateForLanguage(lang string) (templPath string, outName string, ok bool) {
-	l := strings.ToLower(strings.TrimSpace(lang))
-	if l == "" {
+	id := NormalizeLanguageID(lang)
+	spec, ok := GetLanguageSpec(id)
+	if !ok {
 		return "", "", false
 	}
-
-	switch l {
-	case "python3":
-		// NOTE: embedded paths always use forward slashes, so path.Join is correct here
-		return path.Join("templates", l, "main.py.tmpl"), "main.py", true
-	default:
-		return "", "", false
-	}
+	spec = applyDefaults(spec)
+	return spec.TemplatePath, spec.SourceFile, true
 }
 
 /*

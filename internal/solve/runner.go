@@ -12,6 +12,33 @@ import (
 	"time"
 )
 
+type MissingBinaryError struct {
+	Name string
+}
+
+func (e MissingBinaryError) Error() string {
+	return fmt.Sprintf("missing required binary '%s'", e.Name)
+}
+
+type RunnerDeps struct {
+	LookPath func(string) (string, error)
+}
+
+type Runner struct {
+	deps RunnerDeps
+}
+
+func NewRunner(deps RunnerDeps) Runner {
+	if deps.LookPath == nil {
+		deps.LookPath = exec.LookPath
+	}
+	return Runner{deps: deps}
+}
+
+func DefaultRunner() Runner {
+	return NewRunner(RunnerDeps{})
+}
+
 type RunResult struct {
 	Stdout     string
 	Stderr     string
@@ -118,64 +145,77 @@ func splitEnv(kv string) (key, val string, ok bool) {
 	return "", "", false
 }
 
-func RequireBinary(name string) error {
-	_, err := exec.LookPath(name)
+func (r Runner) RequireBinary(name string) error {
+	_, err := r.deps.LookPath(name)
 	if err != nil {
-		return fmt.Errorf("missing required binary %q in PATH", name)
+		return MissingBinaryError{Name: name}
 	}
 	return nil
 }
 
-/*
-Runs any registered language spec.
-If spec.IsCompiled, it compiles every time for now (no caching yet).
-*/
-func RunWithSpec(ctx context.Context, spec LanguageSpec, dir string, stdin []byte, timeoutOverride time.Duration) (RunResult, error) {
+// Backward-compatible wrapper.
+func RequireBinary(name string) error {
+	return DefaultRunner().RequireBinary(name)
+}
+
+func (r Runner) requireIfOnPath(prog string) error {
+	if strings.ContainsAny(prog, `/\\`) || strings.HasPrefix(prog, ".") {
+		return nil
+	}
+	return r.RequireBinary(prog)
+}
+
+func (r Runner) compileIfNeeded(ctx context.Context, spec LanguageSpec, dir string) (RunResult, bool, error) {
 	spec = applyDefaults(spec)
-
-	runTimeout := spec.DefaultTimeout
-	if timeoutOverride > 0 {
-		runTimeout = timeoutOverride
+	if !spec.IsCompiled {
+		return RunResult{}, true, nil
 	}
 
-	if spec.IsCompiled {
-		if err := os.MkdirAll(filepath.Join(dir, spec.BuildDir), 0o755); err != nil {
-			return RunResult{}, err
-		}
-		if len(spec.CompileArgv) == 0 {
-			return RunResult{}, fmt.Errorf("compile argv missing for %s", spec.ID)
-		}
-
-		if err := requireIfOnPath(spec.CompileArgv[0]); err != nil {
-			return RunResult{}, err
-		}
-
-		compileRes, err := RunCommand(ctx, RunOptions{
-			Dir:     dir,
-			Argv:    spec.CompileArgv,
-			Stdin:   nil,
-			Timeout: 10 * time.Second,
-		})
-		if err != nil {
-			return compileRes, err
-		}
-		if compileRes.TimedOut || compileRes.ExitCode != 0 {
-			// Treat as "ran but failed" so UI can show compiler stderr.
-			// (You can label this as CE later in compare.go)
-			if strings.TrimSpace(compileRes.Stderr) != "" {
-				compileRes.Stderr = "compile failed:\n" + compileRes.Stderr
-			} else {
-				compileRes.Stderr = "compile failed"
-			}
-			return compileRes, nil
-		}
+	if err := os.MkdirAll(filepath.Join(dir, spec.BuildDir), 0o755); err != nil {
+		return RunResult{}, false, err
 	}
+	if len(spec.CompileArgv) == 0 {
+		return RunResult{}, false, fmt.Errorf("compile argv missing for %s", spec.ID)
+	}
+	if err := r.requireIfOnPath(spec.CompileArgv[0]); err != nil {
+		return RunResult{}, false, err
+	}
+
+	compileRes, err := RunCommand(ctx, RunOptions{
+		Dir:     dir,
+		Argv:    spec.CompileArgv,
+		Stdin:   nil,
+		Timeout: 10 * time.Second,
+	})
+	if err != nil {
+		return compileRes, false, err
+	}
+
+	if compileRes.TimedOut || compileRes.ExitCode != 0 {
+		if strings.TrimSpace(compileRes.Stderr) != "" {
+			compileRes.Stderr = "compile failed:\n" + compileRes.Stderr
+		} else {
+			compileRes.Stderr = "compile failed"
+		}
+		return compileRes, false, nil
+	}
+
+	return compileRes, true, nil
+}
+
+func (r Runner) runOnly(ctx context.Context, spec LanguageSpec, dir string, stdin []byte, timeoutOverride time.Duration) (RunResult, error) {
+	spec = applyDefaults(spec)
 
 	if len(spec.RunCmd) == 0 {
 		return RunResult{}, fmt.Errorf("run argv missing for %s", spec.ID)
 	}
-	if err := requireIfOnPath(spec.RunCmd[0]); err != nil {
+	if err := r.requireIfOnPath(spec.RunCmd[0]); err != nil {
 		return RunResult{}, err
+	}
+
+	runTimeout := spec.DefaultTimeout
+	if timeoutOverride > 0 {
+		runTimeout = timeoutOverride
 	}
 
 	return RunCommand(ctx, RunOptions{
@@ -186,11 +226,24 @@ func RunWithSpec(ctx context.Context, spec LanguageSpec, dir string, stdin []byt
 	})
 }
 
-func requireIfOnPath(prog string) error {
-	if strings.ContainsAny(prog, `/\`) || strings.HasPrefix(prog, ".") {
-		return nil
+/*
+Runs any registered language spec.
+If spec.IsCompiled, it compiles every time for now (no caching yet).
+*/
+func (r Runner) RunWithSpec(ctx context.Context, spec LanguageSpec, dir string, stdin []byte, timeoutOverride time.Duration) (RunResult, error) {
+	compileRes, ok, err := r.compileIfNeeded(ctx, spec, dir)
+	if err != nil {
+		return RunResult{}, err
 	}
-	return RequireBinary(prog)
+	if !ok {
+		return compileRes, nil
+	}
+	return r.runOnly(ctx, spec, dir, stdin, timeoutOverride)
+}
+
+// Backward-compatible wrapper.
+func RunWithSpec(ctx context.Context, spec LanguageSpec, dir string, stdin []byte, timeoutOverride time.Duration) (RunResult, error) {
+	return DefaultRunner().RunWithSpec(ctx, spec, dir, stdin, timeoutOverride)
 }
 
 // ====================== WRAPPERS =========================
