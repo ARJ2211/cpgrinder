@@ -187,15 +187,13 @@ func RunWithSpec(ctx context.Context, spec LanguageSpec, dir string, stdin []byt
 }
 
 func requireIfOnPath(prog string) error {
-	// If it looks like a path (contains a slash or starts with "."), don't LookPath.
-	// Examples: "./.build/main", ".build/main"
 	if strings.ContainsAny(prog, `/\`) || strings.HasPrefix(prog, ".") {
 		return nil
 	}
 	return RequireBinary(prog)
 }
 
-// Convenience wrappers
+// ====================== WRAPPERS =========================
 
 func RunPython3(ctx context.Context, dir string, stdin []byte, timeout time.Duration) (RunResult, error) {
 	spec, ok := GetLanguageSpec(LangPython3)
