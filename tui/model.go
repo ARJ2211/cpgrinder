@@ -59,8 +59,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			updated, cmd := m.promblemListView.Update(msg)
 			if lm, ok := updated.(problemlist.ProblemListModel); ok {
 				m.promblemListView = lm
-				return m, cmd
 			}
+			return m, cmd
 		}
 		return m, nil
 
@@ -71,21 +71,19 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "ctrl+c", "q":
 				return m, tea.Quit
-
 			case "up", "k":
 				if m.cursor > 0 {
 					m.cursor--
 				}
-
+				return m, nil
 			case "down", "j":
 				if m.cursor < len(m.stateChoices)-1 {
 					m.cursor++
 				}
-
+				return m, nil
 			case "enter", "space":
 				if m.cursor == 0 {
 					m.state = problemlistView
-
 					ws := tea.WindowSizeMsg{Width: m.width, Height: m.height}
 					updated, cmd := m.promblemListView.Update(ws)
 					if lm, ok := updated.(problemlist.ProblemListModel); ok {
@@ -93,28 +91,21 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return m, cmd
 				}
-
 				m.state = notImplemented
 				return m, nil
 			}
 
 		case problemlistView:
+			// only global quit keys here; everything else must go to the child model
 			switch msg.String() {
 			case "ctrl+c", "q":
 				return m, tea.Quit
-			case "esc":
-				m.state = projectView
-				return m, nil
 			}
-
 			updated, cmd := m.promblemListView.Update(msg)
 			if lm, ok := updated.(problemlist.ProblemListModel); ok {
 				m.promblemListView = lm
-				return m, cmd
 			}
-
-			m.state = projectView
-			return m, nil
+			return m, cmd
 
 		case notImplemented:
 			switch msg.String() {
@@ -124,6 +115,20 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state = projectView
 				return m, nil
 			}
+		}
+
+	case problemlist.BackToProjectMsg:
+		m.state = projectView
+		return m, nil
+
+	default:
+		// crucial: forward command results to the active child model
+		if m.state == problemlistView {
+			updated, cmd := m.promblemListView.Update(msg)
+			if lm, ok := updated.(problemlist.ProblemListModel); ok {
+				m.promblemListView = lm
+			}
+			return m, cmd
 		}
 	}
 

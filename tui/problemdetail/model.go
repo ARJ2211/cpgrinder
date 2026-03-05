@@ -9,6 +9,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/glamour"
 
+	"github.com/ARJ2211/cpgrinder/internal/solve"
 	"github.com/ARJ2211/cpgrinder/internal/store"
 	texlite "github.com/ARJ2211/cpgrinder/internal/textlite"
 )
@@ -31,6 +32,13 @@ type ProblemDetailModel struct {
 	// computed locally
 	totalLines int
 	viewH      int
+
+	// full problem record (needed for runSamplesCmd)
+	problem   store.ProblemID
+	runResult samplesOverlay
+
+	currentLang string
+	langPick    langPicker
 }
 
 func New(dbStore *store.Store) ProblemDetailModel {
@@ -39,22 +47,145 @@ func New(dbStore *store.Store) ProblemDetailModel {
 	vp.SetContent("Select a problem to preview its statement")
 
 	return ProblemDetailModel{
-		dbStore:    dbStore,
-		viewport:   vp,
-		totalLines: 1,
-		viewH:      0,
+		dbStore:     dbStore,
+		viewport:    vp,
+		totalLines:  1,
+		viewH:       0,
+		runResult:   newSamplesOverlay(),
+		langPick:    newLangPicker(),
+		currentLang: "python3",
 	}
+}
+
+func (m ProblemDetailModel) IsModalOpen() bool {
+	return m.runResult.show || m.langPick.show
 }
 
 func (m ProblemDetailModel) Init() tea.Cmd { return nil }
 
 func (m ProblemDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Language picker mode
+	if m.langPick.show {
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			switch msg.String() {
+			case "esc":
+				m.langPick.close()
+				return m, nil
+
+			case "up", "k":
+				if m.langPick.cursor > 0 {
+					m.langPick.cursor--
+				}
+				return m, nil
+
+			case "down", "j":
+				if m.langPick.cursor < len(m.langPick.specs)-1 {
+					m.langPick.cursor++
+				}
+				return m, nil
+
+			case "enter", "return", "ctrl+m":
+				spec, ok := m.langPick.selected()
+				if !ok {
+					return m, nil
+				}
+				m.langPick.running = true
+				return m, setLanguageCmd(m.dbStore, m.problem, string(spec.ID))
+			}
+
+		case langSetOKMsg:
+			m.currentLang = msg.lang
+			m.langPick.running = false
+			m.langPick.close()
+			return m, nil
+
+		case langSetErrMsg:
+			m.langPick.running = false
+			// reuse the samples overlay to show the error (simple and obvious)
+			m.langPick.close()
+			m.runResult.setText("language error: " + msg.text + "\n")
+			return m, nil
+		}
+
+		return m, nil
+	}
+
+	// Sample results overlay mode
+	if m.runResult.show {
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			if msg.String() == "esc" {
+				m.runResult.close()
+				return m, nil
+			}
+			var cmd tea.Cmd
+			m.runResult.vp, cmd = m.runResult.vp.Update(msg)
+			return m, cmd
+
+		case runSamplesOKMsg:
+			m.runResult.setText(msg.text)
+			return m, nil
+
+		case runSamplesErrMsg:
+			m.runResult.setText(msg.text + "\n")
+			return m, nil
+
+		case editorDoneMsg:
+			if msg.err != nil {
+				m.runResult.setText("editor error: " + msg.err.Error() + "\n")
+			}
+			return m, nil
+		}
+
+		var cmd tea.Cmd
+		m.runResult.vp, cmd = m.runResult.vp.Update(msg)
+		return m, cmd
+	}
+
+	// Normal mode
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "r":
+			m.runResult.setRunning()
+			return m, runSamplesCmd(m.dbStore, m.problem)
+
+		case "l":
+			m.langPick.open(m.currentLang)
+			return m, nil
+
+		case "e":
+			return m, openEditorCmd(m.dbStore, m.problem)
+		}
+
+	case runSamplesOKMsg:
+		m.runResult.setText(msg.text)
+		return m, nil
+
+	case runSamplesErrMsg:
+		m.runResult.setText(msg.text + "\n")
+		return m, nil
+	}
+
 	var cmd tea.Cmd
 	m.viewport, cmd = m.viewport.Update(msg)
 	return m, cmd
 }
 
 func (m ProblemDetailModel) View() tea.View {
+	if m.langPick.show {
+		v := tea.NewView(m.langPick.view(m.width, m.height))
+		v.WindowTitle = "Language"
+		return v
+	}
+
+	if m.runResult.show {
+		v := tea.NewView(m.runResult.view(m.width, m.height))
+		v.WindowTitle = "Sample Results"
+		return v
+	}
+
 	if m.width <= 0 || m.height <= 0 {
 		return tea.NewView("")
 	}
@@ -113,6 +244,12 @@ func (m ProblemDetailModel) Clear() ProblemDetailModel {
 	m.samples = nil
 	m.totalLines = 1
 
+	m.problem = store.ProblemID{}
+	m.runResult.close()
+
+	m.currentLang = "python3"
+	m.langPick.close()
+
 	m.viewport.SetContent("Select a problem to preview its statement")
 	m.viewport.GotoTop()
 
@@ -120,6 +257,10 @@ func (m ProblemDetailModel) Clear() ProblemDetailModel {
 	m = m.SetSize(m.width, m.height)
 
 	return m
+}
+
+func (m ProblemDetailModel) IsOverlayOpen() bool {
+	return m.runResult.show
 }
 
 func (m ProblemDetailModel) SetMessage(msg string) ProblemDetailModel {
@@ -148,6 +289,19 @@ func (m ProblemDetailModel) LoadProblem(id string) (ProblemDetailModel, error) {
 	m.difficulty = p.Difficulty
 	m.rawMD = p.StatementMd
 	m.samples = p.Samples
+	m.problem = p
+
+	m.currentLang = "python3"
+	if m.dbStore != nil {
+		if dir, err := solve.EnsureProblemDir(m.dbStore.WorkspacePath(), m.problem); err == nil {
+			if cfg, exists, err := (solve.RunConfig{}).ReadRunConfig(dir); err == nil && exists && strings.TrimSpace(cfg.Language) != "" {
+				m.currentLang = cfg.Language
+			}
+		}
+	}
+
+	// close any previous results overlay
+	m.runResult.close()
 
 	// header/footer now exist, so resize viewport accordingly
 	m = m.SetSize(m.width, m.height)
@@ -262,7 +416,7 @@ func (m ProblemDetailModel) renderFooter() string {
 		bot = m.totalLines
 	}
 
-	line := fmt.Sprintf("%3d%%  %d-%d/%d", pct, top, bot, m.totalLines)
+	line := fmt.Sprintf("%3d%%  %d-%d/%d   r run samples   e edit/solve   l language (%s)", pct, top, bot, m.totalLines, m.currentLang)
 	line = fitLine(line, w)
 
 	return sep + "\n" + line

@@ -16,6 +16,7 @@ import (
 var PAGE_LIMIT int = 20
 
 type focusPane int
+type BackToProjectMsg struct{}
 
 const (
 	focusList focusPane = iota
@@ -40,6 +41,8 @@ type ProblemListModel struct {
 	focus  focusPane
 
 	filter filtersearch.Model
+
+	didInitialLayout bool
 }
 
 func InitializeModel(dbStore *store.Store) (ProblemListModel, error) {
@@ -73,14 +76,34 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
-		usableH := max(1, m.height-1) // reserve 1 row for WindowTitle overlay
+		usableH := max(1, m.height-1)
 		m.computeWidths()
 
 		innerW := max(20, m.rightW-2)
 		m.problemStmt = m.problemStmt.SetSize(innerW, usableH)
 
-		// render selected (first) once sizing is known
-		m = m.selectFirstAndRender(innerW, usableH)
+		if !m.didInitialLayout {
+			m.didInitialLayout = true
+
+			if m.selected == "" && len(m.choices) > 0 {
+				m.cursor = 0
+				m.selected = m.choices[0].Id
+			}
+
+			if m.selected != "" {
+				detail, err := m.problemStmt.LoadProblem(m.selected)
+				if err != nil {
+					m.problemStmt = m.problemStmt.Clear().
+						SetMessage("failed to load problem: "+err.Error()).
+						SetSize(innerW, usableH)
+					return m, nil
+				}
+				m.problemStmt = detail.SetSize(innerW, usableH)
+			}
+
+			return m, nil
+		}
+
 		return m, nil
 
 	case tea.KeyPressMsg:
@@ -109,6 +132,22 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m = m.selectFirstAndRender(innerW, usableH)
 			}
 			return m, nil
+		}
+
+		// If the detail pane has any modal open (samples overlay or language picker),
+		// it must receive keypresses first (esc/enter/up/down/etc).
+		if m.problemStmt.IsModalOpen() {
+			// keep global quit keys
+			if msg.String() == "ctrl+c" || msg.String() == "q" {
+				return m, tea.Quit
+			}
+
+			updated, cmd := m.problemStmt.Update(msg)
+			if dm, ok := updated.(pdm.ProblemDetailModel); ok {
+				m.problemStmt = dm
+			}
+			m.focus = focusDetail
+			return m, cmd
 		}
 
 		switch msg.String() {
@@ -233,7 +272,47 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.problemStmt = m.problemStmt.Clear().SetSize(innerW, usableH)
 			m = m.selectFirstAndRender(innerW, usableH)
 			return m, nil
+
+		case "e":
+			updated, cmd := m.problemStmt.Update(msg)
+			m.problemStmt = updated.(pdm.ProblemDetailModel)
+			m.focus = focusDetail
+			return m, cmd
+
+		case "r":
+			updated, cmd := m.problemStmt.Update(msg)
+			if dm, ok := updated.(pdm.ProblemDetailModel); ok {
+				m.problemStmt = dm
+			}
+			m.focus = focusDetail
+			return m, cmd
+
+		case "l":
+			updated, cmd := m.problemStmt.Update(msg)
+			m.problemStmt = updated.(pdm.ProblemDetailModel)
+			m.focus = focusDetail
+			return m, cmd
+
+		case "esc":
+			// if sample overlay is open, close it first
+			if m.problemStmt.IsOverlayOpen() {
+				updated, cmd := m.problemStmt.Update(msg)
+				if dm, ok := updated.(pdm.ProblemDetailModel); ok {
+					m.problemStmt = dm
+				}
+				return m, cmd
+			}
+			// otherwise go back to the main menu
+			return m, func() tea.Msg { return BackToProjectMsg{} }
 		}
+
+	default:
+		updated, cmd := m.problemStmt.Update(msg)
+		if dm, ok := updated.(pdm.ProblemDetailModel); ok {
+			m.problemStmt = dm
+			return m, cmd
+		}
+		return m, nil
 	}
 
 	return m, nil
