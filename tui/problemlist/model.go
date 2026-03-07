@@ -275,7 +275,9 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "e":
 			updated, cmd := m.problemStmt.Update(msg)
-			m.problemStmt = updated.(pdm.ProblemDetailModel)
+			if dm, ok := updated.(pdm.ProblemDetailModel); ok {
+				m.problemStmt = dm
+			}
 			m.focus = focusDetail
 			return m, cmd
 
@@ -289,7 +291,17 @@ func (m ProblemListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "l":
 			updated, cmd := m.problemStmt.Update(msg)
-			m.problemStmt = updated.(pdm.ProblemDetailModel)
+			if dm, ok := updated.(pdm.ProblemDetailModel); ok {
+				m.problemStmt = dm
+			}
+			m.focus = focusDetail
+			return m, cmd
+
+		case "a":
+			updated, cmd := m.problemStmt.Update(msg)
+			if dm, ok := updated.(pdm.ProblemDetailModel); ok {
+				m.problemStmt = dm
+			}
 			m.focus = focusDetail
 			return m, cmd
 

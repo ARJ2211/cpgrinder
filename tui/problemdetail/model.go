@@ -12,6 +12,7 @@ import (
 	"github.com/ARJ2211/cpgrinder/internal/solve"
 	"github.com/ARJ2211/cpgrinder/internal/store"
 	texlite "github.com/ARJ2211/cpgrinder/internal/textlite"
+	"github.com/ARJ2211/cpgrinder/tui/attempts"
 )
 
 type ProblemDetailModel struct {
@@ -39,6 +40,35 @@ type ProblemDetailModel struct {
 
 	currentLang string
 	langPick    langPicker
+
+	attemptsShow  bool
+	attemptsModel attempts.Model
+}
+
+type showAttemptsOKMsg struct {
+	attempts []store.Attempt
+}
+
+type showAttemptsErrMsg struct {
+	text string
+}
+
+func showAttemptsCmd(db *store.Store, problemID string) tea.Cmd {
+	return func() tea.Msg {
+		if db == nil {
+			return showAttemptsErrMsg{text: "missing db store"}
+		}
+		if strings.TrimSpace(problemID) == "" {
+			return showAttemptsErrMsg{text: "no problem loaded"}
+		}
+
+		items, err := db.ListAttemptsByProblemID(problemID, 20)
+		if err != nil {
+			return showAttemptsErrMsg{text: err.Error()}
+		}
+
+		return showAttemptsOKMsg{attempts: items}
+	}
 }
 
 func New(dbStore *store.Store) ProblemDetailModel {
@@ -58,7 +88,7 @@ func New(dbStore *store.Store) ProblemDetailModel {
 }
 
 func (m ProblemDetailModel) IsModalOpen() bool {
-	return m.runResult.show || m.langPick.show
+	return m.runResult.show || m.langPick.show || m.attemptsShow
 }
 
 func (m ProblemDetailModel) Init() tea.Cmd { return nil }
@@ -105,6 +135,7 @@ func (m ProblemDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// reuse the samples overlay to show the error (simple and obvious)
 			m.langPick.close()
 			m.runResult.setText("language error: " + msg.text + "\n")
+			m.runResult.show = true
 			return m, nil
 		}
 
@@ -134,6 +165,7 @@ func (m ProblemDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case editorDoneMsg:
 			if msg.err != nil {
 				m.runResult.setText("editor error: " + msg.err.Error() + "\n")
+				m.runResult.show = true
 			}
 			return m, nil
 		}
@@ -143,21 +175,70 @@ func (m ProblemDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// Attempts overlay mode
+	if m.attemptsShow {
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			switch msg.String() {
+			case "esc", "q":
+				m.attemptsShow = false
+				return m, nil
+			default:
+				var cmd tea.Cmd
+				m.attemptsModel, cmd = m.attemptsModel.Update(msg)
+				return m, cmd
+			}
+
+		case tea.WindowSizeMsg:
+			var cmd tea.Cmd
+			m.attemptsModel, cmd = m.attemptsModel.Update(msg)
+			return m, cmd
+		}
+
+		return m, nil
+	}
+
 	// Normal mode
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
+
+		// Run the script that you write
 		case "r":
+			m.attemptsShow = false
 			m.runResult.setRunning()
 			return m, runSamplesCmd(m.dbStore, m.problem)
 
+		// List all the language and pick one
 		case "l":
+			m.attemptsShow = false
 			m.langPick.open(m.currentLang)
 			return m, nil
 
+		// Open the editor so you can write your solution
 		case "e":
+			m.attemptsShow = false
 			return m, openEditorCmd(m.dbStore, m.problem)
+
+		// List all your prev attempts on this problem
+		case "a":
+			return m, showAttemptsCmd(m.dbStore, m.problemID)
 		}
+
+	case showAttemptsOKMsg:
+		m.attemptsShow = true
+		m.attemptsModel = attempts.New(
+			"Attempts: "+m.title,
+			msg.attempts,
+			m.width,
+			m.height,
+		)
+		return m, nil
+
+	case showAttemptsErrMsg:
+		m.runResult.setText("attempts error: " + msg.text + "\n")
+		m.runResult.show = true
+		return m, nil
 
 	case runSamplesOKMsg:
 		m.runResult.setText(msg.text)
@@ -165,6 +246,15 @@ func (m ProblemDetailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case runSamplesErrMsg:
 		m.runResult.setText(msg.text + "\n")
+		return m, nil
+
+	case tea.WindowSizeMsg:
+		m = m.SetSize(msg.Width, msg.Height)
+		if m.attemptsShow {
+			var cmd tea.Cmd
+			m.attemptsModel, cmd = m.attemptsModel.Update(msg)
+			return m, cmd
+		}
 		return m, nil
 	}
 
@@ -183,6 +273,12 @@ func (m ProblemDetailModel) View() tea.View {
 	if m.runResult.show {
 		v := tea.NewView(m.runResult.view(m.width, m.height))
 		v.WindowTitle = "Sample Results"
+		return v
+	}
+
+	if m.attemptsShow {
+		v := tea.NewView(m.attemptsModel.View())
+		v.WindowTitle = "Attempts"
 		return v
 	}
 
@@ -253,6 +349,9 @@ func (m ProblemDetailModel) Clear() ProblemDetailModel {
 	m.viewport.SetContent("Select a problem to preview its statement")
 	m.viewport.GotoTop()
 
+	m.attemptsShow = false
+	m.attemptsModel = attempts.Model{}
+
 	// header/footer removed, expand viewport back
 	m = m.SetSize(m.width, m.height)
 
@@ -260,7 +359,7 @@ func (m ProblemDetailModel) Clear() ProblemDetailModel {
 }
 
 func (m ProblemDetailModel) IsOverlayOpen() bool {
-	return m.runResult.show
+	return m.runResult.show || m.langPick.show || m.attemptsShow
 }
 
 func (m ProblemDetailModel) SetMessage(msg string) ProblemDetailModel {
@@ -302,6 +401,10 @@ func (m ProblemDetailModel) LoadProblem(id string) (ProblemDetailModel, error) {
 
 	// close any previous results overlay
 	m.runResult.close()
+
+	// close previous attempts overlay
+	m.attemptsShow = false
+	m.attemptsModel = attempts.Model{}
 
 	// header/footer now exist, so resize viewport accordingly
 	m = m.SetSize(m.width, m.height)
@@ -416,7 +519,7 @@ func (m ProblemDetailModel) renderFooter() string {
 		bot = m.totalLines
 	}
 
-	line := fmt.Sprintf("%3d%%  %d-%d/%d   r run samples   e edit/solve   l language (%s)", pct, top, bot, m.totalLines, m.currentLang)
+	line := fmt.Sprintf("%3d%%  %d-%d/%d   r run samples   a attempts   e edit/solve   l language (%s)", pct, top, bot, m.totalLines, m.currentLang)
 	line = fitLine(line, w)
 
 	return sep + "\n" + line
