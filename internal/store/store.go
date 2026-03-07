@@ -475,3 +475,133 @@ func (s *Store) CountProblemsWithFilters(uf UserFilters) (int, error) {
 	}
 	return count, nil
 }
+
+/*
+This function is required to insert an attempt into the
+sqlite db when a user hits "r"
+*/
+func (s *Store) InsertAttempt(in CreateAttemptInput) error {
+	if s == nil || s.db == nil {
+		return errors.New("store is nil")
+	}
+	if in.ProblemID == "" {
+		return errors.New("problem id is required")
+	}
+
+	id := uuid.NewString()
+	createdAt := time.Now().Unix()
+
+	_, err := s.db.Exec(`
+		INSERT INTO attempts (
+			id,
+			problem_id,
+			daily_set_id,
+			started_at,
+			finished_at,
+			status,
+			verdict,
+			notes,
+			language,
+			time_spent_seconds,
+			created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`,
+		id,
+		in.ProblemID,
+		in.DailySetID,
+		in.StartedAt,
+		in.FinishedAt,
+		in.Status,
+		in.Verdict,
+		in.Notes,
+		in.Language,
+		in.TimeSpentSeconds,
+		createdAt,
+	)
+	return err
+}
+
+/*
+This function will list all the atetmpts for a given
+problem ID
+*/
+func (s *Store) ListAttemptsByProblemID(problemID string, limit int) ([]Attempt, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("store is nil")
+	}
+	if problemID == "" {
+		return nil, errors.New("problem id is required")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+
+	rows, err := s.db.Query(`
+		SELECT
+			id,
+			problem_id,
+			daily_set_id,
+			started_at,
+			finished_at,
+			status,
+			verdict,
+			notes,
+			language,
+			time_spent_seconds,
+			created_at
+		FROM attempts
+		WHERE problem_id = ?
+		ORDER BY created_at DESC
+		LIMIT ?
+	`, problemID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []Attempt
+	for rows.Next() {
+		var a Attempt
+		var dailySetID sql.NullString
+		var startedAt sql.NullInt64
+		var finishedAt sql.NullInt64
+
+		err := rows.Scan(
+			&a.ID,
+			&a.ProblemID,
+			&dailySetID,
+			&startedAt,
+			&finishedAt,
+			&a.Status,
+			&a.Verdict,
+			&a.Notes,
+			&a.Language,
+			&a.TimeSpentSeconds,
+			&a.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if dailySetID.Valid {
+			v := dailySetID.String
+			a.DailySetID = &v
+		}
+		if startedAt.Valid {
+			v := startedAt.Int64
+			a.StartedAt = &v
+		}
+		if finishedAt.Valid {
+			v := finishedAt.Int64
+			a.FinishedAt = &v
+		}
+
+		out = append(out, a)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}

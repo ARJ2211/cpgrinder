@@ -60,3 +60,19 @@ type UserFilters struct {
 	Limit      int
 	Offset     int
 }
+
+/*
+Creates an attempt input that will
+allow us to dump in the DB
+*/
+type CreateAttemptInput struct {
+	ProblemID        string
+	DailySetID       *string
+	StartedAt        *int64
+	FinishedAt       *int64
+	Status           string
+	Verdict          string
+	Notes            string
+	Language         string
+	TimeSpentSeconds int
+}
