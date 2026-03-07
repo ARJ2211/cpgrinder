@@ -127,13 +127,13 @@ func (p *langPicker) view(width, height int) string {
 		boxH = 18
 	}
 
-	title := "Select language"
+	title := "\n\nSelect language\n\n"
 	if p.running {
 		title = "Setting language..."
 	}
 
 	header := lipgloss.NewStyle().Padding(0, 1).Render(title)
-	footer := lipgloss.NewStyle().Padding(0, 1).Render("enter select  esc cancel  ↑↓ move")
+	footer := lipgloss.NewStyle().Padding(0, 1).Render("\n\n\nenter select | esc cancel | ↑↓ move")
 
 	var b strings.Builder
 	for i, s := range p.specs {
