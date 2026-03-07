@@ -13,6 +13,12 @@
   <img src="https://img.shields.io/badge/Platform-Terminal-black?style=flat-square&logo=gnometerminal&logoColor=white" />
 </p>
 
+## Demo
+
+<p align="center">
+  <img src="assets/process.gif" alt="CPGrinder demo">
+</p>
+
 ---
 
 ## What Is CPGrinder?
