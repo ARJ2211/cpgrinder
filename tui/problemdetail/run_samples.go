@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -58,12 +59,34 @@ func runSamplesCmd(db *store.Store, p store.ProblemID) tea.Cmd {
 			return runSamplesErrMsg{text: err.Error()}
 		}
 
+		started := time.Now().Unix()
+
 		res, err := solve.RunSamples(context.Background(), spec, dir, p.Samples, 0)
 		if err != nil {
 			return runSamplesErrMsg{text: err.Error()}
 		}
 
-		return runSamplesOKMsg{text: formatSamplesResult(spec, dir, res)}
+		finished := time.Now().Unix()
+		status, verdict := attemptOutcome(res)
+
+		text := formatSamplesResult(spec, dir, res)
+
+		err = db.InsertAttempt(store.CreateAttemptInput{
+			ProblemID:        p.Id,
+			DailySetID:       nil,
+			StartedAt:        &started,
+			FinishedAt:       &finished,
+			Status:           status,
+			Verdict:          verdict,
+			Notes:            "",
+			Language:         string(lang),
+			TimeSpentSeconds: int(finished - started),
+		})
+		if err != nil {
+			text += "\n\nwarning: failed to save attempt: " + err.Error()
+		}
+
+		return runSamplesOKMsg{text: text}
 	}
 }
 
@@ -219,4 +242,28 @@ func (o *samplesOverlay) view(width, height int) string {
 		Render(header + "\n" + o.vp.View() + "\n" + footer)
 
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, card)
+}
+
+/*
+Utility finction to return the verdict of the run
+and print some human readable errors / success.
+*/
+func attemptOutcome(r solve.SamplesResult) (status, verdict string) {
+	if r.Compile != nil {
+		return "attempted", "CE"
+	}
+	if r.AllPassed {
+		return "solved", "AC"
+	}
+
+	for _, c := range r.Cases {
+		if c.Run.TimedOut {
+			return "attempted", "TLE"
+		}
+		if c.Run.ExitCode != 0 {
+			return "attempted", "RE"
+		}
+	}
+
+	return "attempted", "WA"
 }
