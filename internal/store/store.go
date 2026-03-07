@@ -2,8 +2,10 @@ package store
 
 import (
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"math/rand"
 	"os"
 	"slices"
@@ -15,6 +17,9 @@ import (
 )
 
 const RAND_SEED = 42069 // NICE
+
+//go:embed fixtures/catalog.json
+var defaultFixtures embed.FS
 
 /*
 Struct to help store the DB Store properties.
@@ -212,7 +217,8 @@ func (s *Store) UpsertProblemsFromFixture(fixturePath string) error {
 		}
 		data = dataT
 	} else {
-		dataT, err := os.ReadFile("fixtures/catalog.json")
+		// dataT, err := os.ReadFile("fixtures/catalog.json")
+		dataT, err := fs.ReadFile(defaultFixtures, "fixtures/catalog.json")
 		if err != nil {
 			return err
 		}
