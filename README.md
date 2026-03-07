@@ -10,7 +10,7 @@
   <img src="https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go&logoColor=white" />
   <img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square" />
   <img src="https://img.shields.io/badge/Problems-8200+-orange?style=flat-square&logo=codeforces&logoColor=white" />
-  <img src="https://img.shields.io/badge/Platform-Terminal-black?style=flat-square&logo=gnometerminal&logoColor=white" />
+  <img src="https://img.shields.io/badge/Platform-Terminal-green?style=flat-square&logo=gnometerminal&logoColor=white" />
 </p>
 
 ---
