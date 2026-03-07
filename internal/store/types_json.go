@@ -27,3 +27,21 @@ type ProblemJson struct {
 	StatementMd string       `json:"statement_md"`
 	Samples     []SampleJson `json:"samples"`
 }
+
+/*
+Json Format for the attemt so we can
+marshal / unmarshal it
+*/
+type Attempt struct {
+	ID               string  `json:"id"`
+	ProblemID        string  `json:"problem_id"`
+	DailySetID       *string `json:"daily_set_id,omitempty"`
+	StartedAt        *int64  `json:"started_at,omitempty"`
+	FinishedAt       *int64  `json:"finished_at,omitempty"`
+	Status           string  `json:"status"`
+	Verdict          string  `json:"verdict"`
+	Notes            string  `json:"notes"`
+	Language         string  `json:"language"`
+	TimeSpentSeconds int     `json:"time_spent_seconds"`
+	CreatedAt        int64   `json:"created_at"`
+}
