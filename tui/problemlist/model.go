@@ -13,7 +13,7 @@ import (
 	"github.com/ARJ2211/cpgrinder/tui/styles"
 )
 
-var PAGE_LIMIT int = 20
+var PAGE_LIMIT int = 30
 
 type focusPane int
 type BackToProjectMsg struct{}
@@ -500,11 +500,4 @@ func clamp(v, lo, hi int) int {
 		return hi
 	}
 	return v
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
