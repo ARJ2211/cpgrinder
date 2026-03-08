@@ -19,3 +19,8 @@ var GlamourMD, _ = glamour.NewTermRenderer(
 	glamour.WithWordWrap(100),
 	glamour.WithChromaFormatter(">"),
 )
+
+// Styles for table
+var TableStyle = lipgloss.NewStyle().
+	BorderStyle(lipgloss.NormalBorder()).
+	BorderForeground(lipgloss.Color("240"))
