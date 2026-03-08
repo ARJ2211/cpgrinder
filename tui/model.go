@@ -7,6 +7,7 @@ import (
 	"github.com/ARJ2211/cpgrinder/internal/store"
 
 	"github.com/ARJ2211/cpgrinder/tui/problemlist"
+	"github.com/ARJ2211/cpgrinder/tui/progress"
 )
 
 type sessionState int
@@ -14,6 +15,7 @@ type sessionState int
 const (
 	projectView sessionState = iota
 	problemlistView
+	progressTracker
 	notImplemented
 )
 
@@ -29,6 +31,7 @@ type MainModel struct {
 	height int
 
 	promblemListView problemlist.ProblemListModel
+	progressTracker  progress.ProgressTrackerModel
 }
 
 func InitializeModel(dbStore *store.Store) (MainModel, error) {
@@ -82,6 +85,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case "enter", "space":
+				// When user selects "List Problems"
 				if m.cursor == 0 {
 					m.state = problemlistView
 					ws := tea.WindowSizeMsg{Width: m.width, Height: m.height}
@@ -91,6 +95,18 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					return m, cmd
 				}
+
+				// When user selects show activity
+				if m.cursor == 1 {
+					m.state = progressTracker
+					ws := tea.WindowSizeMsg{Width: m.width, Height: m.height}
+					updated, cmd := m.progressTracker.Update(ws)
+					if lm, ok := updated.(progress.ProgressTrackerModel); ok {
+						m.progressTracker = lm
+					}
+					return m, cmd
+				}
+
 				m.state = notImplemented
 				return m, nil
 			}
@@ -107,6 +123,18 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 
+		case progressTracker:
+			// only global quit keys here
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			}
+			updated, cmd := m.progressTracker.Update(msg)
+			if lm, ok := updated.(progress.ProgressTrackerModel); ok {
+				m.progressTracker = lm
+			}
+			return m, cmd
+
 		case notImplemented:
 			switch msg.String() {
 			case "ctrl+c", "q":
@@ -118,6 +146,10 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case problemlist.BackToProjectMsg:
+		m.state = projectView
+		return m, nil
+
+	case progress.BackToProjectMsg:
 		m.state = projectView
 		return m, nil
 
@@ -160,6 +192,9 @@ func (m MainModel) View() tea.View {
 
 	case problemlistView:
 		return m.promblemListView.View()
+
+	case progressTracker:
+		return m.progressTracker.View()
 
 	default:
 		msg := fmt.Sprintf("%s is not yet implemented... Coming soon :)", m.stateChoices[m.cursor])
