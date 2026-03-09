@@ -6,6 +6,7 @@ import (
 
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/ARJ2211/cpgrinder/internal/store"
 	"github.com/ARJ2211/cpgrinder/tui/styles"
 )
@@ -203,18 +204,26 @@ func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m ProgressTrackerModel) View() tea.View {
+	headingStyles := lipgloss.NewStyle().
+		Bold(true).
+		Blink(true).
+		Border(lipgloss.RoundedBorder(), true, true, true, true).
+		BorderStyle(lipgloss.ThickBorder())
+
 	mainTableHeading := "LIST OF ALL ATTEMPTED PROBLEMS\n"
 	detailTableHeading := fmt.Sprintf(
 		"ALL ATTEMPTS FOR : %s\n", m.detailProblemName,
 	)
 
-	v := tea.NewView(
-		mainTableHeading +
-			styles.TableStyle.Render(m.table.View()) +
-			"\n  " + m.table.HelpView() + "\n" +
-			detailTableHeading +
-			styles.TableStyle.Render(m.detailTable.View()),
+	content := lipgloss.JoinVertical(
+		lipgloss.Center,
+		headingStyles.Render(mainTableHeading),
+		styles.TableStyle.Render(m.table.View()),
+		headingStyles.Render(detailTableHeading),
+		styles.TableStyle.Render(m.detailTable.View()),
 	)
+
+	v := tea.NewView(content)
 	v.WindowTitle = "Progress Tracker"
 	return v
 }

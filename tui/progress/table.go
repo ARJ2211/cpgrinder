@@ -88,6 +88,10 @@ func buildTable(db *store.Store) (table.Model, map[int]string, error) {
 	)
 
 	s := table.DefaultStyles()
+
+	s.Header.Border(lipgloss.NormalBorder())
+	s.Selected.Border(lipgloss.NormalBorder())
+
 	s.Header = s.Header.
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("240")).
