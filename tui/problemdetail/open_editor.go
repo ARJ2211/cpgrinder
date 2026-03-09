@@ -90,9 +90,9 @@ func buildEditorCmd(filePath string) (*exec.Cmd, error) {
 	args := append([]string{}, argv[1:]...)
 
 	// If use VS Code without waiting, add -w so cpgrinder waits until file closes.
-	if filepath.Base(argv[0]) == "code" && !hasWaitFlag(args) {
-		args = append([]string{"-w"}, args...)
-	}
+	// if filepath.Base(argv[0]) == "code" && !hasWaitFlag(args) {
+	// 	args = append([]string{"-w"}, args...)
+	// }
 
 	args = append(args, filePath)
 
@@ -105,7 +105,8 @@ func buildEditorCmd(filePath string) (*exec.Cmd, error) {
 
 func defaultEditorArgv() []string {
 	candidates := [][]string{
-		{"code", "-w"},
+		// {"code", "-w"},
+		{"code"},
 		{"nvim"},
 		{"vim"},
 		{"nano"},
