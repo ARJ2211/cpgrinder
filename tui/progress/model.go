@@ -14,11 +14,13 @@ type BackToProjectMsg struct{}
 const defaultVisibleRows = 25
 
 type ProgressTrackerModel struct {
-	dbStore   *store.Store
-	width     int
-	height    int
-	table     table.Model
-	noToIDMap map[int]string
+	dbStore *store.Store
+	width   int
+	height  int
+
+	table       table.Model    // This is to show the main table
+	detailTable table.Model    // This is to show the detail table
+	noToIDMap   map[int]string // This is to map the row num to the problem ID
 }
 
 func InitializeModel(dbStore *store.Store) (ProgressTrackerModel, error) {
