@@ -33,7 +33,7 @@ type Model struct {
 
 	Title      string
 	Source     string // "all" | "codeforces" | "leetcode"
-	Difficulty string // "all" | "easy" | "medium" | "hard"
+	Difficulty string // "all" | "easy" | "medium" | "hard" | "expert"
 	Topic      string
 	Tag        string
 
@@ -233,7 +233,7 @@ func cycleSource(cur string, dir int) string {
 }
 
 func cycleDiff(cur string, dir int) string {
-	opts := []string{"all", "easy", "medium", "hard"}
+	opts := []string{"all", "easy", "medium", "hard", "expert"}
 	return cycle(opts, cur, dir)
 }
 
