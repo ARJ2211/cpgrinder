@@ -37,13 +37,13 @@ func tableContentWidth(cols []table.Column) int {
 /*
 Function to build the table and its rows.
 */
-func buildTable(db *store.Store) (table.Model, error) {
+func buildTable(db *store.Store) (table.Model, map[int]string, error) {
 	cols := getTableColumns()
 	noToIDMap := map[int]string{}
 
 	attemptsData, err := db.ListAllAttempts()
 	if err != nil {
-		return table.Model{}, err
+		return table.Model{}, nil, err
 	}
 
 	rows := []table.Row{}
@@ -51,7 +51,7 @@ func buildTable(db *store.Store) (table.Model, error) {
 	for i, attempt := range attemptsData {
 		problem, err := db.GetProblemByID(attempt.ProblemID)
 		if err != nil {
-			return table.Model{}, err
+			return table.Model{}, nil, err
 		}
 
 		startedAt := "-"
@@ -104,5 +104,5 @@ func buildTable(db *store.Store) (table.Model, error) {
 	tableModel.SetWidth(tableContentWidth(cols))
 	tableModel.SetHeight(defaultVisibleRows)
 
-	return tableModel, nil
+	return tableModel, noToIDMap, nil
 }

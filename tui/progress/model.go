@@ -1,6 +1,8 @@
 package progress
 
 import (
+	"strconv"
+
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
 	"github.com/ARJ2211/cpgrinder/internal/store"
@@ -12,21 +14,23 @@ type BackToProjectMsg struct{}
 const defaultVisibleRows = 25
 
 type ProgressTrackerModel struct {
-	dbStore *store.Store
-	width   int
-	height  int
-	table   table.Model
+	dbStore   *store.Store
+	width     int
+	height    int
+	table     table.Model
+	noToIDMap map[int]string
 }
 
 func InitializeModel(dbStore *store.Store) (ProgressTrackerModel, error) {
-	tbl, err := buildTable(dbStore)
+	tbl, noToID, err := buildTable(dbStore)
 	if err != nil {
 		return ProgressTrackerModel{}, err
 	}
 
 	m := ProgressTrackerModel{
-		dbStore: dbStore,
-		table:   tbl,
+		dbStore:   dbStore,
+		table:     tbl,
+		noToIDMap: noToID,
 	}
 
 	m.sizeTable()
@@ -77,19 +81,28 @@ func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Refresh the rows in the table (refetch)
 		case "r":
-			updatedTable, err := buildTable(m.dbStore)
+			updatedTable, noToID, err := buildTable(m.dbStore)
 			if err != nil {
 				return ProgressTrackerModel{}, nil
 			}
 
 			m.table = updatedTable
+			m.noToIDMap = noToID
 			return m, nil
 
 		// When something is selected using enter or space
 		case "enter", "space":
-			selected := m.table.SelectedRow()
+			selectedID := m.table.SelectedRow()
+
+			id, err := strconv.Atoi(selectedID[0])
+			if err != nil {
+				return ProgressTrackerModel{}, nil
+			}
+
+			problemID := m.noToIDMap[id]
+
 			return m, tea.Batch(
-				tea.Printf("Let's go to %s!", selected),
+				tea.Printf("Let's go to %s!", problemID),
 			)
 		}
 	}
