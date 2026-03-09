@@ -9,7 +9,7 @@ import (
 
 type BackToProjectMsg struct{}
 
-const defaultVisibleRows = 7
+const defaultVisibleRows = 25
 
 type ProgressTrackerModel struct {
 	dbStore *store.Store
@@ -66,10 +66,24 @@ func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyPressMsg:
 		switch msg.String() {
+
+		// Close the program globally
 		case "q", "ctrl+c":
 			return m, tea.Quit
+
+		// Go to the previous screen
 		case "esc":
 			return m, func() tea.Msg { return BackToProjectMsg{} }
+
+		// Refresh the rows in the table (refetch)
+		case "r":
+			updatedTable, err := buildTable(m.dbStore)
+			if err != nil {
+				return ProgressTrackerModel{}, nil
+			}
+
+			m.table = updatedTable
+			return m, nil
 		}
 	}
 
