@@ -84,6 +84,13 @@ func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.table = updatedTable
 			return m, nil
+
+		// When something is selected using enter or space
+		case "enter", "space":
+			selected := m.table.SelectedRow()
+			return m, tea.Batch(
+				tea.Printf("Let's go to %s!", selected),
+			)
 		}
 	}
 

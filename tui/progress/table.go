@@ -39,6 +39,7 @@ Function to build the table and its rows.
 */
 func buildTable(db *store.Store) (table.Model, error) {
 	cols := getTableColumns()
+	noToIDMap := map[int]string{}
 
 	attemptsData, err := db.ListAllAttempts()
 	if err != nil {
@@ -75,6 +76,8 @@ func buildTable(db *store.Store) (table.Model, error) {
 			attempt.Language,
 			fmt.Sprintf("%d", attempt.TimeSpentSeconds),
 		}
+
+		noToIDMap[i+1] = attempt.ProblemID
 
 		rows = append(rows, row)
 	}
