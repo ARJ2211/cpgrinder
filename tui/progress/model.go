@@ -32,6 +32,8 @@ type ProgressTrackerModel struct {
 	noToIDMap         map[int]string
 	detailProblemName string
 
+	heatmapModel HeatMapModel
+
 	focus focusState
 }
 
@@ -62,6 +64,13 @@ func InitializeModel(dbStore *store.Store) (ProgressTrackerModel, error) {
 
 	model.sizeTable()
 	model.FocusMain()
+
+	heatmap, err := InitializeHeatmapModel(dbStore)
+	if err != nil {
+		return ProgressTrackerModel{}, err
+	}
+
+	model.heatmapModel = heatmap
 
 	return model, nil
 }
@@ -223,7 +232,13 @@ func (m ProgressTrackerModel) View() tea.View {
 		styles.TableStyle.Render(m.detailTable.View()),
 	)
 
-	content = lipgloss.JoinHorizontal(lipgloss.Center, content, "                      Heatmap goes here...")
+	heatmap := m.heatmapModel.View()
+	content = lipgloss.JoinHorizontal(
+		lipgloss.Center,
+		content,
+		"                 ",
+		heatmap.Content,
+	)
 
 	v := tea.NewView(content)
 	v.WindowTitle = "Progress Tracker"
