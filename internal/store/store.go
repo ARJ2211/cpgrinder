@@ -605,3 +605,77 @@ func (s *Store) ListAttemptsByProblemID(problemID string, limit int) ([]Attempt,
 
 	return out, nil
 }
+
+/*
+This function will list all the atetmpts
+*/
+func (s *Store) ListAllAttempts() ([]Attempt, error) {
+	if s == nil || s.db == nil {
+		return nil, errors.New("store is nil")
+	}
+
+	rows, err := s.db.Query(`
+		SELECT *
+		FROM (
+    		SELECT *,
+        	ROW_NUMBER() OVER (
+				PARTITION BY problem_id ORDER BY created_at DESC
+			) as rn
+    		FROM 
+        	attempts
+		) AS subquery
+		WHERE 
+    	rn = 1;
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []Attempt
+	for rows.Next() {
+		var a Attempt
+		var dailySetID sql.NullString
+		var startedAt sql.NullInt64
+		var finishedAt sql.NullInt64
+		var rn string
+		err := rows.Scan(
+			&a.ID,
+			&a.ProblemID,
+			&dailySetID,
+			&startedAt,
+			&finishedAt,
+			&a.Status,
+			&a.Verdict,
+			&a.Notes,
+			&a.Language,
+			&a.TimeSpentSeconds,
+			&a.CreatedAt,
+			&rn,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if dailySetID.Valid {
+			v := dailySetID.String
+			a.DailySetID = &v
+		}
+		if startedAt.Valid {
+			v := startedAt.Int64
+			a.StartedAt = &v
+		}
+		if finishedAt.Valid {
+			v := finishedAt.Int64
+			a.FinishedAt = &v
+		}
+
+		out = append(out, a)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
