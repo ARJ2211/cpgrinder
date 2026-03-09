@@ -223,6 +223,8 @@ func (m ProgressTrackerModel) View() tea.View {
 		styles.TableStyle.Render(m.detailTable.View()),
 	)
 
+	content = lipgloss.JoinHorizontal(lipgloss.Center, content, "                      Heatmap goes here...")
+
 	v := tea.NewView(content)
 	v.WindowTitle = "Progress Tracker"
 	return v
