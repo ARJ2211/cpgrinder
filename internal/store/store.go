@@ -680,3 +680,26 @@ func (s *Store) ListAllAttempts() ([]Attempt, error) {
 
 	return out, nil
 }
+
+/*
+Utility function to get the name of a problem id
+*/
+func (m *Store) GetName(id string) (string, error) {
+	if id == "" || strings.TrimSpace(id) == "" {
+		return "", errors.New("no id provided")
+	}
+
+	queryString := (`
+		SELECT title FROM problems
+		WHERE id = ?
+	`)
+
+	var problemName string
+
+	row := m.db.QueryRow(queryString, id)
+	if err := row.Scan(&problemName); err != nil {
+		return "", err
+	}
+
+	return problemName, nil
+}

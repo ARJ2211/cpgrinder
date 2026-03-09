@@ -15,7 +15,7 @@ Get all the columns required.
 func getTableColumns() []table.Column {
 	return []table.Column{
 		{Title: "No", Width: 4},
-		{Title: "Name", Width: 28},
+		{Title: "Name", Width: 24},
 		{Title: "Started At", Width: 20},
 		{Title: "Finished At", Width: 20},
 		{Title: "Created At", Width: 20},
@@ -85,7 +85,6 @@ func buildTable(db *store.Store) (table.Model, map[int]string, error) {
 	tableModel := table.New(
 		table.WithColumns(cols),
 		table.WithRows(rows),
-		table.WithFocused(true),
 	)
 
 	s := table.DefaultStyles()
@@ -158,7 +157,6 @@ func buildDetailTable(db *store.Store, problemID string) (table.Model, error) {
 	tableModel := table.New(
 		table.WithColumns(cols),
 		table.WithRows(rows),
-		table.WithFocused(false),
 	)
 
 	s := table.DefaultStyles()
@@ -168,10 +166,10 @@ func buildDetailTable(db *store.Store, problemID string) (table.Model, error) {
 		BorderBottom(true).
 		Bold(true)
 
-	// s.Selected = s.Selected.
-	// 	Foreground(lipgloss.Color("229")).
-	// 	Background(lipgloss.Color("57")).
-	// 	Bold(false)
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("29")).
+		Background(lipgloss.Color("#b4face")).
+		Bold(false)
 
 	tableModel.SetStyles(s)
 	tableModel.SetWidth(tableContentWidth(cols))
