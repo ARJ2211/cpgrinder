@@ -42,12 +42,18 @@ func InitializeModel(dbStore *store.Store) (MainModel, error) {
 		return MainModel{}, err
 	}
 
+	progressTracker, err := progress.InitializeModel(dbStore)
+	if err != nil {
+		return MainModel{}, err
+	}
+
 	return MainModel{
 		dbStore:          dbStore,
 		prevState:        projectView,
 		state:            projectView,
 		stateChoices:     []string{"List Problems", "Show Activity", "Some more features..."},
 		promblemListView: promblemListView,
+		progressTracker:  progressTracker,
 	}, nil
 }
 
@@ -64,6 +70,14 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			updated, cmd := m.promblemListView.Update(msg)
 			if lm, ok := updated.(problemlist.ProblemListModel); ok {
 				m.promblemListView = lm
+			}
+			return m, cmd
+		}
+
+		if m.state == progressTracker {
+			updated, cmd := m.progressTracker.Update(msg)
+			if lm, ok := updated.(progress.ProgressTrackerModel); ok {
+				m.progressTracker = lm
 			}
 			return m, cmd
 		}
@@ -101,6 +115,7 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// When user selects show activity
 				if m.cursor == 1 {
 					m.state = progressTracker
+
 					ws := tea.WindowSizeMsg{Width: m.width, Height: m.height}
 					updated, cmd := m.progressTracker.Update(ws)
 					if lm, ok := updated.(progress.ProgressTrackerModel); ok {

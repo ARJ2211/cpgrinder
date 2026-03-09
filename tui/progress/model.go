@@ -3,18 +3,57 @@ package progress
 import (
 	"charm.land/bubbles/v2/table"
 	tea "charm.land/bubbletea/v2"
+	"github.com/ARJ2211/cpgrinder/internal/store"
 	"github.com/ARJ2211/cpgrinder/tui/styles"
 )
 
 type BackToProjectMsg struct{}
 
+const defaultVisibleRows = 7
+
 type ProgressTrackerModel struct {
-	width  int
-	height int
-	table  table.Model
+	dbStore *store.Store
+	width   int
+	height  int
+	table   table.Model
+}
+
+func InitializeModel(dbStore *store.Store) (ProgressTrackerModel, error) {
+	tbl, err := buildTable(dbStore)
+	if err != nil {
+		return ProgressTrackerModel{}, err
+	}
+
+	m := ProgressTrackerModel{
+		dbStore: dbStore,
+		table:   tbl,
+	}
+
+	m.sizeTable()
+	return m, nil
 }
 
 func (m ProgressTrackerModel) Init() tea.Cmd { return nil }
+
+func (m *ProgressTrackerModel) sizeTable() {
+	desiredWidth := tableContentWidth(getTableColumns())
+	desiredHeight := defaultVisibleRows
+
+	// Before the first WindowSizeMsg arrives, keep the table compact.
+	if m.width == 0 || m.height == 0 {
+		m.table.SetWidth(desiredWidth)
+		m.table.SetHeight(desiredHeight)
+		return
+	}
+
+	frameW, frameH := styles.TableStyle.GetFrameSize()
+
+	availableWidth := max(20, m.width-frameW)
+	availableHeight := max(5, m.height-frameH-2)
+
+	m.table.SetWidth(min(desiredWidth, availableWidth))
+	m.table.SetHeight(min(desiredHeight, availableHeight))
+}
 
 func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -23,9 +62,7 @@ func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-
-		m.table.SetHeight(msg.Height - 5)
-		m.table.SetWidth(msg.Width - 5)
+		m.sizeTable()
 
 	case tea.KeyPressMsg:
 		switch msg.String() {
@@ -45,6 +82,5 @@ func (m ProgressTrackerModel) View() tea.View {
 		styles.TableStyle.Render(m.table.View()) + "\n  " + m.table.HelpView() + "\n",
 	)
 	v.WindowTitle = "Progress Tracker"
-
 	return v
 }
