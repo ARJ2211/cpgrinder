@@ -4,10 +4,12 @@ import (
 	"fmt"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/ARJ2211/cpgrinder/internal/store"
 
 	"github.com/ARJ2211/cpgrinder/tui/problemlist"
 	"github.com/ARJ2211/cpgrinder/tui/progress"
+	"github.com/ARJ2211/cpgrinder/tui/styles"
 )
 
 type sessionState int
@@ -167,28 +169,152 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m MainModel) renderProjectView() string {
+	banner := styles.RenderBanner()
+
+	menuDescriptions := []string{
+		"Browse the synced problem set and open something worth solving.",
+		"Track streaks, solved counts, and recent terminal activity.",
+		"Extra experiments and upcoming features. Free free to reach out or contribute your own :)",
+	}
+
+	totalWidth := 100
+	if m.width > 0 {
+		totalWidth = clamp(m.width-12, 92, 116)
+	}
+
+	hero := styles.HeroCardStyle.Width(totalWidth).Render(
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			styles.KickerStyle.Render("terminal-first competitive programming\n\n"),
+			banner,
+			styles.SubtitleStyle.Render("Your terminal-based competitive coding platform                                       "),
+		),
+	)
+
+	leftWidth := 58
+	rightWidth := totalWidth - leftWidth - 2
+	if totalWidth < 104 {
+		leftWidth = totalWidth
+		rightWidth = totalWidth
+	}
+
+	menuLines := make([]string, 0, len(m.stateChoices))
+	for i, choice := range m.stateChoices {
+		desc := ""
+		if i < len(menuDescriptions) {
+			desc = menuDescriptions[i]
+		}
+
+		row := lipgloss.JoinVertical(
+			lipgloss.Left,
+			styles.MenuLabelStyle.Render(choice),
+			styles.MenuDescStyle.Render(desc),
+		)
+
+		if m.cursor == i {
+			menuLines = append(menuLines, styles.SelectedMenuItemStyle.Width(leftWidth-6).Render(row))
+		} else {
+			menuLines = append(menuLines, styles.MenuItemStyle.Width(leftWidth-6).Render(row))
+		}
+	}
+
+	menuCard := styles.CardStyle.Width(leftWidth).Render(
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			styles.SectionTitleStyle.Render("What do you want to do today?                       "),
+			lipgloss.JoinVertical(lipgloss.Left, menuLines...),
+		),
+	)
+
+	sideCard := styles.InfoCardStyle.Width(rightWidth).Render(
+		lipgloss.JoinVertical(
+			lipgloss.Left,
+			styles.SectionTitleStyle.Render("Quick start"),
+			renderShortcut("↑/↓ or j/k", "move through the menu"),
+			renderShortcut("enter", "open the selected view"),
+			renderShortcut("q", "quit the app"),
+			"",
+		),
+	)
+
+	var body string
+	if totalWidth >= 104 {
+		body = lipgloss.JoinHorizontal(
+			lipgloss.Top,
+			menuCard,
+			"  ",
+			sideCard,
+		)
+	} else {
+		body = lipgloss.JoinVertical(
+			lipgloss.Left,
+			menuCard,
+			sideCard,
+		)
+	}
+
+	footer := styles.HelpStyle.Render("Ready when you are.")
+
+	content := lipgloss.JoinVertical(
+		lipgloss.Left,
+		hero,
+		body,
+		footer,
+	)
+
+	content = styles.AppStyle.Render(content)
+
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Top, content)
+	}
+
+	return content
+}
+
+func renderShortcut(key, description string) string {
+	return lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		styles.KeyStyle.Render(key),
+		" ",
+		styles.MutedStyle.Render(description),
+	)
+}
+
+func clamp(v, low, high int) int {
+	if v < low {
+		return low
+	}
+	if v > high {
+		return high
+	}
+	return v
+}
+
+func (m MainModel) renderNotImplemented() string {
+	msg := fmt.Sprintf("%s is not yet implemented... Coming soon :)", m.stateChoices[m.cursor])
+	help := styles.HelpStyle.Render("Press esc to go back • q to quit")
+
+	content := lipgloss.JoinVertical(
+		lipgloss.Left,
+		styles.NotImplStyle.Render(msg),
+		help,
+	)
+
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, content)
+	}
+
+	return content
+}
+
 func (m MainModel) View() tea.View {
 	switch m.state {
 
 	case projectView:
-		s := "Welcome to CpGrinder - Your terminal based competitive coding platform\n\n"
-		s += "Please select what you would like to do today! \n\n"
-
-		for i, choice := range m.stateChoices {
-			cursor := " "
-			if m.cursor == i {
-				cursor = ">"
-			}
-
-			checked := " "
-			if m.cursor == i {
-				checked = "x"
-			}
-
-			s += fmt.Sprintf("%s [%s] %s\n", cursor, checked, choice)
-		}
-
-		return tea.NewView(s)
+		v := tea.NewView(m.renderProjectView())
+		v.WindowTitle = "CPGrinder"
+		return v
 
 	case problemlistView:
 		return m.promblemListView.View()
@@ -197,9 +323,8 @@ func (m MainModel) View() tea.View {
 		return m.progressTracker.View()
 
 	default:
-		msg := fmt.Sprintf("%s is not yet implemented... Coming soon :)", m.stateChoices[m.cursor])
-		v := tea.NewView(msg)
-		v.WindowTitle = "CpGrinder"
+		v := tea.NewView(m.renderNotImplemented())
+		v.WindowTitle = "CPGrinder"
 		return v
 	}
 }
