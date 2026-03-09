@@ -106,3 +106,76 @@ func buildTable(db *store.Store) (table.Model, map[int]string, error) {
 
 	return tableModel, noToIDMap, nil
 }
+
+/*
+Function to build the detail table and its rows.
+*/
+func buildDetailTable(db *store.Store, problemID string) (table.Model, error) {
+	cols := getTableColumns()
+	noToIDMap := map[int]string{}
+
+	attemptsData, err := db.ListAttemptsByProblemID(problemID, 0)
+	if err != nil {
+		return table.Model{}, err
+	}
+
+	rows := []table.Row{}
+
+	for i, attempt := range attemptsData {
+		problem, err := db.GetProblemByID(attempt.ProblemID)
+		if err != nil {
+			return table.Model{}, err
+		}
+
+		startedAt := "-"
+		if attempt.StartedAt != nil {
+			startedAt = time.Unix(*attempt.StartedAt, 0).Format("02 Jan 2006 03:04 PM")
+		}
+
+		finishedAt := "-"
+		if attempt.FinishedAt != nil {
+			finishedAt = time.Unix(*attempt.FinishedAt, 0).Format("02 Jan 2006 03:04 PM")
+		}
+
+		createdAt := time.Unix(attempt.CreatedAt, 0).Format("02 Jan 2006 03:04 PM")
+
+		row := table.Row{
+			fmt.Sprintf("%d", i+1),
+			problem.Title,
+			startedAt,
+			finishedAt,
+			createdAt,
+			attempt.Verdict,
+			attempt.Language,
+			fmt.Sprintf("%d", attempt.TimeSpentSeconds),
+		}
+
+		noToIDMap[i+1] = attempt.ProblemID
+
+		rows = append(rows, row)
+	}
+
+	tableModel := table.New(
+		table.WithColumns(cols),
+		table.WithRows(rows),
+		table.WithFocused(false),
+	)
+
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderBottom(true).
+		Bold(true)
+
+	// s.Selected = s.Selected.
+	// 	Foreground(lipgloss.Color("229")).
+	// 	Background(lipgloss.Color("57")).
+	// 	Bold(false)
+
+	tableModel.SetStyles(s)
+	tableModel.SetWidth(tableContentWidth(cols))
+	tableModel.SetHeight(defaultVisibleRows)
+
+	return tableModel, nil
+}

@@ -625,7 +625,8 @@ func (s *Store) ListAllAttempts() ([]Attempt, error) {
         	attempts
 		) AS subquery
 		WHERE 
-    	rn = 1;
+    	rn = 1
+		ORDER BY subquery.created_at DESC;
 	`)
 	if err != nil {
 		return nil, err

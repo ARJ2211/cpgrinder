@@ -29,14 +29,24 @@ func InitializeModel(dbStore *store.Store) (ProgressTrackerModel, error) {
 		return ProgressTrackerModel{}, err
 	}
 
-	m := ProgressTrackerModel{
-		dbStore:   dbStore,
-		table:     tbl,
-		noToIDMap: noToID,
+	var model ProgressTrackerModel
+	model.dbStore = dbStore
+	model.table = tbl
+	model.noToIDMap = noToID
+
+	row1, ok := noToID[1]
+	if ok {
+		dtlTbl, err := buildDetailTable(dbStore, row1)
+		if err != nil {
+			return ProgressTrackerModel{}, err
+		}
+
+		model.detailTable = dtlTbl
 	}
 
-	m.sizeTable()
-	return m, nil
+	model.sizeTable()
+
+	return model, nil
 }
 
 func (m ProgressTrackerModel) Init() tea.Cmd { return nil }
@@ -103,9 +113,17 @@ func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			problemID := m.noToIDMap[id]
 
-			return m, tea.Batch(
-				tea.Printf("Let's go to %s!", problemID),
-			)
+			// TODO: Initialize the problem detail table here
+			dtlTbl, err := buildDetailTable(m.dbStore, problemID)
+			if err != nil {
+				return ProgressTrackerModel{}, nil
+			}
+
+			// Pass updated to the new table now
+			updated, cmd := dtlTbl.Update(msg)
+			m.detailTable = updated
+
+			return m, cmd
 		}
 	}
 
@@ -115,7 +133,7 @@ func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m ProgressTrackerModel) View() tea.View {
 	v := tea.NewView(
-		styles.TableStyle.Render(m.table.View()) + "\n  " + m.table.HelpView() + "\n",
+		styles.TableStyle.Render(m.table.View()) + "\n  " + m.table.HelpView() + "\n" + styles.TableStyle.Render(m.detailTable.View()),
 	)
 	v.WindowTitle = "Progress Tracker"
 	return v
