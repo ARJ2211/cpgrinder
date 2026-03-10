@@ -219,10 +219,15 @@ func (m ProgressTrackerModel) View() tea.View {
 		Border(lipgloss.RoundedBorder(), true, true, true, true).
 		BorderStyle(lipgloss.ThickBorder())
 
-	mainTableHeading := "LIST OF ALL ATTEMPTED PROBLEMS\n"
+	heatmapStyle := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true, true, true, true).
+		BorderStyle(lipgloss.NormalBorder()).Padding(1, 1, 1, 1)
+
+	mainTableHeading := "LIST OF ALL ATTEMPTED PROBLEMS"
 	detailTableHeading := fmt.Sprintf(
-		"ALL ATTEMPTS FOR : %s\n", m.detailProblemName,
+		"ALL ATTEMPTS FOR : %s", m.detailProblemName,
 	)
+	heatmapHeading := "GITHUB LIKE STATS"
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Center,
@@ -233,11 +238,16 @@ func (m ProgressTrackerModel) View() tea.View {
 	)
 
 	heatmap := m.heatmapModel.View()
+	heatmapContent := lipgloss.JoinVertical(
+		lipgloss.Center,
+		headingStyles.Render(heatmapHeading),
+		heatmapStyle.Render(heatmap.Content),
+	)
 	content = lipgloss.JoinHorizontal(
 		lipgloss.Center,
 		content,
-		"                 ",
-		heatmap.Content,
+		"    ",
+		heatmapContent,
 	)
 
 	v := tea.NewView(content)
