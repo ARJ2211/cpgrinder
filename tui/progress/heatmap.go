@@ -1,11 +1,19 @@
 package progress
 
 import (
-	"math/rand"
+	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/ARJ2211/cpgrinder/internal/store"
 )
+
+type HeatMapCell struct {
+	Date     time.Time
+	Count    int
+	IsFuture bool
+	Symbol   string
+}
 
 type HeatMapModel struct {
 	width  int
@@ -14,14 +22,68 @@ type HeatMapModel struct {
 	cellR int
 	cellC int
 
-	cellContents []string
+	grid     [][]HeatMapCell // [53][7]
+	maxCount int
+}
+
+func symbolForHeatmap(count int, isFuture bool, maxCount int) string {
+	if isFuture {
+		return "•"
+	}
+
+	if count <= 0 {
+		return "·"
+	}
+
+	if maxCount <= 3 {
+		switch count {
+		case 1:
+			return "░"
+		case 2:
+			return "▒"
+		default:
+			return "▓"
+		}
+	}
+
+	ratio := float64(count) / float64(maxCount)
+
+	switch {
+	case ratio <= 0.34:
+		return "░"
+	case ratio <= 0.67:
+		return "▒"
+	default:
+		return "▓"
+	}
 }
 
 func InitializeHeatmapModel(dbStore *store.Store) (HeatMapModel, error) {
+	const weeks = 53
+
+	rawGrid, maxCount, err := dbStore.GetAttemptHeatmapData(weeks)
+	if err != nil {
+		return HeatMapModel{}, err
+	}
+
 	model := HeatMapModel{
-		cellR:        7,
-		cellC:        53,
-		cellContents: []string{"▓", "▒", "░"},
+		cellR:    7,
+		cellC:    weeks,
+		maxCount: maxCount,
+		grid:     make([][]HeatMapCell, weeks),
+	}
+
+	for col := 0; col < weeks; col++ {
+		model.grid[col] = make([]HeatMapCell, 7)
+		for row := 0; row < 7; row++ {
+			day := rawGrid[col][row]
+			model.grid[col][row] = HeatMapCell{
+				Date:     day.Date,
+				Count:    day.Count,
+				IsFuture: day.IsFuture,
+				Symbol:   symbolForHeatmap(day.Count, day.IsFuture, maxCount),
+			}
+		}
 	}
 
 	return model, nil
@@ -36,16 +98,15 @@ func (m HeatMapModel) Update(_ tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m HeatMapModel) View() tea.View {
-	content := ""
+	var b strings.Builder
 
-	for i := 0; i < m.cellR; i++ {
-		for j := 0; j < m.cellC; j++ {
-			randomIndex := rand.Intn(len(m.cellContents))
-			content += m.cellContents[randomIndex] + " "
+	for row := 0; row < m.cellR; row++ {
+		for col := 0; col < m.cellC; col++ {
+			b.WriteString(m.grid[col][row].Symbol)
+			b.WriteString(" ")
 		}
-		content += "\n"
+		b.WriteString("\n")
 	}
 
-	v := tea.NewView(content)
-	return v
+	return tea.NewView(b.String())
 }

@@ -15,7 +15,7 @@ Get all the columns required.
 func getTableColumns() []table.Column {
 	return []table.Column{
 		{Title: "No", Width: 4},
-		{Title: "Name", Width: 24},
+		{Title: "Name", Width: 20},
 		{Title: "Started At", Width: 20},
 		{Title: "Finished At", Width: 20},
 		{Title: "Created At", Width: 20},
