@@ -6,6 +6,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/ARJ2211/cpgrinder/internal/store"
+	zone "github.com/lrstanley/bubblezone/v2"
 
 	"github.com/ARJ2211/cpgrinder/tui/problemlist"
 	"github.com/ARJ2211/cpgrinder/tui/progress"
@@ -179,6 +180,13 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, cmd
 		}
+		if m.state == progressTracker {
+			updated, cmd := m.progressTracker.Update(msg)
+			if lm, ok := updated.(progress.ProgressTrackerModel); ok {
+				m.progressTracker = lm
+			}
+			return m, cmd
+		}
 	}
 
 	return m, nil
@@ -335,7 +343,10 @@ func (m MainModel) View() tea.View {
 		return m.promblemListView.View()
 
 	case progressTracker:
-		return m.progressTracker.View()
+		v := m.progressTracker.View()
+		v.MouseMode = tea.MouseModeCellMotion
+		v.SetContent(zone.Scan(v.Content))
+		return v
 
 	default:
 		v := tea.NewView(m.renderNotImplemented())

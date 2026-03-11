@@ -32,6 +32,8 @@ type ProgressTrackerModel struct {
 	noToIDMap         map[int]string
 	detailProblemName string
 
+	heatmapModel HeatMapModel
+
 	focus focusState
 }
 
@@ -62,6 +64,13 @@ func InitializeModel(dbStore *store.Store) (ProgressTrackerModel, error) {
 
 	model.sizeTable()
 	model.FocusMain()
+
+	heatmap, err := InitializeHeatmapModel(dbStore)
+	if err != nil {
+		return ProgressTrackerModel{}, err
+	}
+
+	model.heatmapModel = heatmap
 
 	return model, nil
 }
@@ -174,6 +183,13 @@ func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		// Forward mouse events to the heatmap so click zones are handled
+		if _, ok := msg.(tea.MouseClickMsg); ok {
+			updatedHeatmap, heatCmd := m.heatmapModel.Update(msg)
+			m.heatmapModel = updatedHeatmap.(HeatMapModel)
+			return m, heatCmd
+		}
+
 		m.table, cmd = m.table.Update(msg)
 		return m, cmd
 
@@ -210,10 +226,15 @@ func (m ProgressTrackerModel) View() tea.View {
 		Border(lipgloss.RoundedBorder(), true, true, true, true).
 		BorderStyle(lipgloss.ThickBorder())
 
-	mainTableHeading := "LIST OF ALL ATTEMPTED PROBLEMS\n"
+	heatmapStyle := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true, true, true, true).
+		BorderStyle(lipgloss.NormalBorder()).Padding(1, 1, 1, 1)
+
+	mainTableHeading := "LIST OF ALL ATTEMPTED PROBLEMS"
 	detailTableHeading := fmt.Sprintf(
-		"ALL ATTEMPTS FOR : %s\n", m.detailProblemName,
+		"ALL ATTEMPTS FOR : %s", m.detailProblemName,
 	)
+	heatmapHeading := "GITHUB LIKE STATS"
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Center,
@@ -223,7 +244,17 @@ func (m ProgressTrackerModel) View() tea.View {
 		styles.TableStyle.Render(m.detailTable.View()),
 	)
 
-	content = lipgloss.JoinHorizontal(lipgloss.Center, content, "                      Heatmap goes here...")
+	heatmapContent := lipgloss.JoinVertical(
+		lipgloss.Center,
+		headingStyles.Render(heatmapHeading),
+		heatmapStyle.Render(m.heatmapModel.Render()),
+	)
+	content = lipgloss.JoinHorizontal(
+		lipgloss.Center,
+		content,
+		"    ",
+		heatmapContent,
+	)
 
 	v := tea.NewView(content)
 	v.WindowTitle = "Progress Tracker"

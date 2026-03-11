@@ -703,3 +703,91 @@ func (m *Store) GetName(id string) (string, error) {
 
 	return problemName, nil
 }
+
+const heatmapDateLayout = "2006-01-02"
+
+type HeatmapDay struct {
+	Date     time.Time
+	Count    int
+	IsFuture bool
+}
+
+func normalizeToDay(t time.Time) time.Time {
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+}
+
+// GitHub-style week starts on Sunday.
+func startOfWeek(t time.Time) time.Time {
+	t = normalizeToDay(t)
+	return t.AddDate(0, 0, -int(t.Weekday()))
+}
+
+/*
+GetAttemptHeatmapData returns [weeks][7] in a github
+style heatmap
+*/
+func (s *Store) GetAttemptHeatmapData(weeks int) ([][]HeatmapDay, int, error) {
+	if s == nil || s.db == nil {
+		return nil, 0, errors.New("store is nil")
+	}
+	if weeks <= 0 {
+		weeks = 53
+	}
+
+	now := time.Now()
+	today := normalizeToDay(now)
+	start := startOfWeek(today).AddDate(0, 0, -7*(weeks-1))
+	end := start.AddDate(0, 0, weeks*7-1)
+
+	rows, err := s.db.Query(`
+		SELECT
+			date(created_at, 'unixepoch', 'localtime') AS day,
+			COUNT(DISTINCT problem_id) AS cnt
+		FROM attempts
+		WHERE date(created_at, 'unixepoch', 'localtime') BETWEEN ? AND ?
+		GROUP BY day
+	`,
+		start.Format(heatmapDateLayout),
+		end.Format(heatmapDateLayout),
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	countsByDay := make(map[string]int)
+	maxCount := 0
+
+	for rows.Next() {
+		var day string
+		var cnt int
+		if err := rows.Scan(&day, &cnt); err != nil {
+			return nil, 0, err
+		}
+		countsByDay[day] = cnt
+		if cnt > maxCount {
+			maxCount = cnt
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+
+	grid := make([][]HeatmapDay, weeks)
+	for col := 0; col < weeks; col++ {
+		grid[col] = make([]HeatmapDay, 7)
+		for row := 0; row < 7; row++ {
+			d := start.AddDate(0, 0, col*7+row)
+			dayKey := d.Format(heatmapDateLayout)
+
+			grid[col][row] = HeatmapDay{
+				Date:     d,
+				Count:    countsByDay[dayKey],
+				IsFuture: d.After(today),
+			}
+		}
+	}
+
+	return grid, maxCount, nil
+}

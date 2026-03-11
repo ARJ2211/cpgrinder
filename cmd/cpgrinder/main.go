@@ -7,6 +7,7 @@ import (
 	"os"
 
 	tea "charm.land/bubbletea/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
 
 	"github.com/ARJ2211/cpgrinder/internal/platform"
 	"github.com/ARJ2211/cpgrinder/internal/store"
@@ -25,6 +26,7 @@ func PrintJSON(obj interface{}) {
 }
 
 func main() {
+	zone.NewGlobal()
 	var gf globalFlags
 
 	flag.StringVar(&gf.DB, "db", "", "use custom DB path to sqlite")
