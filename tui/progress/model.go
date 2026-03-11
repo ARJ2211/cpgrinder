@@ -146,6 +146,12 @@ func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.noToIDMap = noToID
 				m.table.Focus()
 				m.sizeTable()
+
+				updated, err := InitializeHeatmapModel(m.dbStore)
+				if err != nil {
+					return ProgressTrackerModel{}, nil
+				}
+				m.heatmapModel = updated
 				return m, nil
 
 			case "enter", "space":
@@ -210,6 +216,13 @@ func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.FocusMain()
 				return m, nil
 			}
+		}
+
+		// Forward mouse events to the heatmap so click zones are handled
+		if _, ok := msg.(tea.MouseClickMsg); ok {
+			updatedHeatmap, heatCmd := m.heatmapModel.Update(msg)
+			m.heatmapModel = updatedHeatmap.(HeatMapModel)
+			return m, heatCmd
 		}
 
 		m.detailTable, cmd = m.detailTable.Update(msg)

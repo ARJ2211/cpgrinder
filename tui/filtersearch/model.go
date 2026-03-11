@@ -233,7 +233,7 @@ func cycleSource(cur string, dir int) string {
 }
 
 func cycleDiff(cur string, dir int) string {
-	opts := []string{"all", "easy", "medium", "hard", "expert"}
+	opts := []string{"all", "easy", "medium", "hard", "expert", "unknown"}
 	return cycle(opts, cur, dir)
 }
 
