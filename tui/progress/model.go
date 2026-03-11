@@ -232,22 +232,69 @@ func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+/*
+This function will render a legend
+*/
+func (m ProgressTrackerModel) renderLegend() string {
+	keyStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("cyan"))
+
+	descStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("241"))
+
+	separator := descStyle.Render(" | ")
+
+	var keys []string
+
+	if m.focus == focusMain {
+		keys = []string{
+			keyStyle.Render("↑↓") + descStyle.Render(" navigate"),
+			keyStyle.Render("enter/space") + descStyle.Render(" view attempts"),
+			keyStyle.Render("r") + descStyle.Render(" refresh"),
+			keyStyle.Render("esc") + descStyle.Render(" back to main menu"),
+			keyStyle.Render("q") + descStyle.Render(" quit"),
+		}
+	} else {
+		keys = []string{
+			keyStyle.Render("↑↓") + descStyle.Render(" navigate"),
+			keyStyle.Render("esc") + descStyle.Render(" back to problems"),
+			keyStyle.Render("q") + descStyle.Render(" quit"),
+		}
+	}
+
+	legend := ""
+	for i, k := range keys {
+		legend += k
+		if i < len(keys)-1 {
+			legend += separator
+		}
+	}
+
+	return lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), true).
+		BorderForeground(lipgloss.Color("238")).
+		Padding(0, 1).
+		Render(legend)
+}
+
 func (m ProgressTrackerModel) View() tea.View {
 	headingStyles := lipgloss.NewStyle().
 		Bold(true).
-		Blink(true).
+		Blink(false).
 		Border(lipgloss.RoundedBorder(), true, true, true, true).
 		BorderStyle(lipgloss.ThickBorder())
 
 	heatmapStyle := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true, true, true, true).
-		BorderStyle(lipgloss.NormalBorder()).Padding(1, 1, 1, 1)
+		Border(lipgloss.NormalBorder(), true).
+		BorderForeground(lipgloss.Color("238")).
+		Padding(1)
 
 	mainTableHeading := "LIST OF ALL ATTEMPTED PROBLEMS"
 	detailTableHeading := fmt.Sprintf(
 		"ALL ATTEMPTS FOR : %s", m.detailProblemName,
 	)
-	heatmapHeading := "GITHUB LIKE STATS"
+	heatmapHeading := "HEATMAP STATS"
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Center,
@@ -255,6 +302,7 @@ func (m ProgressTrackerModel) View() tea.View {
 		styles.TableStyle.Render(m.table.View()),
 		headingStyles.Render(detailTableHeading),
 		styles.TableStyle.Render(m.detailTable.View()),
+		m.renderLegend(),
 	)
 
 	heatmapContent := lipgloss.JoinVertical(

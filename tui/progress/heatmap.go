@@ -6,10 +6,15 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	zone "github.com/lrstanley/bubblezone/v2"
 
 	"github.com/ARJ2211/cpgrinder/internal/store"
 )
+
+var statusStyle = lipgloss.NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("#a3a334"))
 
 type HeatMapCell struct {
 	Date     time.Time
@@ -38,6 +43,11 @@ const (
 )
 
 func symbolForHeatmap(count int, isFuture bool, maxCount int) string {
+
+	lightGreen := lipgloss.NewStyle().Foreground(lipgloss.Color("#98d696"))
+	mediumGreen := lipgloss.NewStyle().Foreground(lipgloss.Color("#187315"))
+	darkGreen := lipgloss.NewStyle().Foreground(lipgloss.Color("#043603"))
+
 	if isFuture {
 		return "·"
 	}
@@ -48,11 +58,11 @@ func symbolForHeatmap(count int, isFuture bool, maxCount int) string {
 	if maxCount <= 3 {
 		switch count {
 		case 1:
-			return "░"
+			return lightGreen.Render("▓")
 		case 2:
-			return "▒"
+			return mediumGreen.Render("▓")
 		default:
-			return "▓"
+			return darkGreen.Render("▓")
 		}
 	}
 
@@ -60,11 +70,11 @@ func symbolForHeatmap(count int, isFuture bool, maxCount int) string {
 
 	switch {
 	case ratio <= 0.34:
-		return "░"
+		return lightGreen.Render("▓")
 	case ratio <= 0.67:
-		return "▒"
+		return mediumGreen.Render("▓")
 	default:
-		return "▓"
+		return darkGreen.Render("▓")
 	}
 }
 
@@ -142,7 +152,7 @@ func (m HeatMapModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m HeatMapModel) Render() string {
 	var b strings.Builder
 
-	b.WriteString(m.renderMonthHeader())
+	b.WriteString(statusStyle.Render(m.renderMonthHeader()))
 	b.WriteString("\n")
 
 	for row := 0; row < m.cellR; row++ {
@@ -151,7 +161,7 @@ func (m HeatMapModel) Render() string {
 	}
 
 	b.WriteString("\n")
-	b.WriteString(m.status)
+	b.WriteString(statusStyle.Render(m.status))
 	b.WriteString("\n")
 
 	return b.String()
@@ -175,11 +185,11 @@ func plural(n int) string {
 func (m HeatMapModel) dayLabel(row int) string {
 	switch row {
 	case 1:
-		return "Mon"
+		return statusStyle.Render("Mon  ")
 	case 3:
-		return "Wed"
+		return statusStyle.Render("Wed  ")
 	case 5:
-		return "Fri"
+		return statusStyle.Render("Fri  ")
 	default:
 		return ""
 	}
