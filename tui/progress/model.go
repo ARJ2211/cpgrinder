@@ -183,6 +183,13 @@ func (m ProgressTrackerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+		// Forward mouse events to the heatmap so click zones are handled
+		if _, ok := msg.(tea.MouseClickMsg); ok {
+			updatedHeatmap, heatCmd := m.heatmapModel.Update(msg)
+			m.heatmapModel = updatedHeatmap.(HeatMapModel)
+			return m, heatCmd
+		}
+
 		m.table, cmd = m.table.Update(msg)
 		return m, cmd
 
@@ -237,11 +244,10 @@ func (m ProgressTrackerModel) View() tea.View {
 		styles.TableStyle.Render(m.detailTable.View()),
 	)
 
-	heatmap := m.heatmapModel.View()
 	heatmapContent := lipgloss.JoinVertical(
 		lipgloss.Center,
 		headingStyles.Render(heatmapHeading),
-		heatmapStyle.Render(heatmap.Content),
+		heatmapStyle.Render(m.heatmapModel.Render()),
 	)
 	content = lipgloss.JoinHorizontal(
 		lipgloss.Center,

@@ -6,6 +6,8 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	zone "github.com/lrstanley/bubblezone/v2"
+
 	"github.com/ARJ2211/cpgrinder/internal/store"
 )
 
@@ -17,27 +19,28 @@ type HeatMapCell struct {
 }
 
 type HeatMapModel struct {
-	width  int
-	height int
-
 	cellR int
 	cellC int
 
-	grid     [][]HeatMapCell // [53][7] => [week][day]
+	width  int
+	height int
+
+	grid     [][]HeatMapCell // [week][day]
 	maxCount int
+
+	status string
 }
 
 const (
 	heatmapWeeks   = 53
-	leftLabelWidth = 5 // enough for "Mon  "
-	cellWidth      = 2 // one symbol + one space
+	leftLabelWidth = 5
+	cellWidth      = 2 // one symbol + one trailing space
 )
 
 func symbolForHeatmap(count int, isFuture bool, maxCount int) string {
 	if isFuture {
 		return "·"
 	}
-
 	if count <= 0 {
 		return "·"
 	}
@@ -76,6 +79,7 @@ func InitializeHeatmapModel(dbStore *store.Store) (HeatMapModel, error) {
 		cellC:    heatmapWeeks,
 		maxCount: maxCount,
 		grid:     make([][]HeatMapCell, heatmapWeeks),
+		status:   "Click a day to inspect activity",
 	}
 
 	for col := 0; col < heatmapWeeks; col++ {
@@ -98,11 +102,76 @@ func (m HeatMapModel) Init() tea.Cmd {
 	return nil
 }
 
-func (m HeatMapModel) Update(_ tea.Msg) (tea.Model, tea.Cmd) {
+func (m HeatMapModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+
+	case tea.MouseClickMsg:
+		if msg.Button != tea.MouseLeft {
+			return m, nil
+		}
+
+		for col := 0; col < m.cellC; col++ {
+			for row := 0; row < m.cellR; row++ {
+				if zone.Get(m.zoneID(col, row)).InBounds(msg) {
+					cell := m.grid[col][row]
+
+					if cell.IsFuture {
+						m.status = fmt.Sprintf("Future date: %s", cell.Date.Format("2006-01-02"))
+					} else {
+						m.status = fmt.Sprintf(
+							"%d attempt%s on %s",
+							cell.Count,
+							plural(cell.Count),
+							cell.Date.Format("2006-01-02"),
+						)
+					}
+
+					return m, nil
+				}
+			}
+		}
+	}
+
 	return m, nil
 }
 
-// Github tyle left labels (only show Mon, Wed, Fri)
+func (m HeatMapModel) Render() string {
+	var b strings.Builder
+
+	b.WriteString(m.renderMonthHeader())
+	b.WriteString("\n")
+
+	for row := 0; row < m.cellR; row++ {
+		b.WriteString(m.renderRow(row))
+		b.WriteString("\n")
+	}
+
+	b.WriteString("\n")
+	b.WriteString(m.status)
+	b.WriteString("\n")
+
+	return b.String()
+}
+
+func (m HeatMapModel) View() tea.View {
+	return tea.NewView(m.Render())
+}
+
+func (m HeatMapModel) zoneID(col, row int) string {
+	return fmt.Sprintf("heatmap-%d-%d", col, row)
+}
+
+func plural(n int) string {
+	if n == 1 {
+		return ""
+	}
+	return "s"
+}
+
 func (m HeatMapModel) dayLabel(row int) string {
 	switch row {
 	case 1:
@@ -116,7 +185,6 @@ func (m HeatMapModel) dayLabel(row int) string {
 	}
 }
 
-// Github style month labels
 func (m HeatMapModel) monthStarts() map[int]string {
 	out := make(map[int]string)
 
@@ -144,7 +212,7 @@ func (m HeatMapModel) renderMonthHeader() string {
 	runes := []rune(strings.Repeat(" ", totalGridWidth))
 
 	monthCols := m.monthStarts()
-	lastWrittenEnd := -1000
+	lastWrittenEnd := -999
 
 	for col := 0; col < m.cellC; col++ {
 		label, ok := monthCols[col]
@@ -153,8 +221,6 @@ func (m HeatMapModel) renderMonthHeader() string {
 		}
 
 		pos := col * cellWidth
-
-		// Skip if this label would collide with the previous one.
 		if pos <= lastWrittenEnd {
 			continue
 		}
@@ -166,6 +232,7 @@ func (m HeatMapModel) renderMonthHeader() string {
 			}
 			runes[pos+i] = r
 		}
+
 		lastWrittenEnd = pos + len(labelRunes) - 1
 	}
 
@@ -175,27 +242,13 @@ func (m HeatMapModel) renderMonthHeader() string {
 func (m HeatMapModel) renderRow(row int) string {
 	var b strings.Builder
 
-	label := m.dayLabel(row)
-	b.WriteString(fmt.Sprintf("%-*s", leftLabelWidth, label))
+	b.WriteString(fmt.Sprintf("%-*s", leftLabelWidth, m.dayLabel(row)))
 
 	for col := 0; col < m.cellC; col++ {
-		b.WriteString(m.grid[col][row].Symbol)
-		b.WriteString(" ")
+		cell := m.grid[col][row]
+		renderedCell := zone.Mark(m.zoneID(col, row), cell.Symbol+" ")
+		b.WriteString(renderedCell)
 	}
 
 	return b.String()
-}
-
-func (m HeatMapModel) View() tea.View {
-	var b strings.Builder
-
-	b.WriteString(m.renderMonthHeader())
-	b.WriteString("\n")
-
-	for row := 0; row < m.cellR; row++ {
-		b.WriteString(m.renderRow(row))
-		b.WriteString("\n")
-	}
-
-	return tea.NewView(b.String())
 }
