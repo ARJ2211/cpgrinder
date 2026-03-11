@@ -737,12 +737,12 @@ func (s *Store) GetAttemptHeatmapData(weeks int) ([][]HeatmapDay, int, error) {
 	now := time.Now()
 	today := normalizeToDay(now)
 	start := startOfWeek(today).AddDate(0, 0, -7*(weeks-1))
-	end := start.AddDate(0, 0, weeks*7-1)
+	end := startOfWeek(today).AddDate(0, 0, 6) // always end on this Saturday
 
 	rows, err := s.db.Query(`
 		SELECT
 			date(created_at, 'unixepoch', 'localtime') AS day,
-			COUNT(DISTINCT problem_id) AS cnt
+			COUNT(*) AS cnt
 		FROM attempts
 		WHERE date(created_at, 'unixepoch', 'localtime') BETWEEN ? AND ?
 		GROUP BY day
