@@ -31,15 +31,15 @@ The problem bank is sourced from **Codeforces**, with over **8,200 problems** sc
 
 ## Features
 
-| Feature                | Description                                                                           |
-| ---------------------- | ------------------------------------------------------------------------------------- |
-| **Problem Bank**       | 8,200+ Codeforces problems with metadata: title, source, difficulty, topics, and tags |
-| **Problem Detail**     | Full statement view with rendered markdown and sample I/O                             |
-| **Editor Integration** | Press `e` to open your solution file in your configured editor                        |
-| **Sample Execution**   | Press `r` to run your solution against stored sample test cases                       |
-| **Language Switching** | Press `l` to switch between supported languages per problem                           |
-| **Run History**        | Press `a` to view all previous attempts for the current problem                       |
-| **Filter & Search**    | Narrow problems by source, difficulty, title, topic, and tag                          |
+| Feature                | Description                                                                            |
+| ---------------------- | -------------------------------------------------------------------------------------- |
+| **Problem Bank**       | 11,000+ Codeforces problems with metadata: title, source, difficulty, topics, and tags |
+| **Problem Detail**     | Full statement view with rendered markdown and sample I/O                              |
+| **Editor Integration** | Press `e` to open your solution file in your configured editor                         |
+| **Sample Execution**   | Press `r` to run your solution against stored sample test cases                        |
+| **Language Switching** | Press `l` to switch between supported languages per problem                            |
+| **Run History**        | Press `a` to view all previous attempts for the current problem                        |
+| **Filter & Search**    | Narrow problems by source, difficulty, title, topic, and tag                           |
 
 ### Supported Languages
 
