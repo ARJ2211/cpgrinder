@@ -343,8 +343,8 @@ CPGrinder keeps a local SQLite store for problems and attempts, and a per-proble
 
 ## Roadmap
 
-- [ ] Global activity dashboard across all solved and attempted problems
-- [ ] Richer attempt analytics
+- [x] Global activity dashboard across all solved and attempted problems
+- [x] Richer attempt analytics
 - [ ] Daily practice streaks and workflows
 - [ ] Stronger progress tracking
 - [ ] Improved workspace and session management
